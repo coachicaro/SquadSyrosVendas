@@ -280,7 +280,12 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     </div>
     <div class="field"><label>Parcela do cliente (R$)</label><input type="number" step="0.01" id="vParcela" oninput="atualizarPreviewComissao()"></div>
     <div class="hint" id="vPreview">Comissão bruta: R$ 0,00 · Líquida (−11%): R$ 0,00</div>
-    <div class="field" style="margin-top:14px"><label>Origem</label><input type="text" id="vOrigem" placeholder="Ex: BNI, Indicação, Orgânico"></div>
+    <div class="field" style="margin-top:14px"><label>Origem</label>
+      <select id="vOrigem">
+        <option value="Lead Marketing">Lead Marketing</option>
+        <option value="Prospecção do Vendedor">Prospecção do Vendedor</option>
+      </select>
+    </div>
     <div class="field"><label>Observação</label><textarea id="vObs" rows="2"></textarea></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modalVenda')">Cancelar</button>
@@ -313,7 +318,12 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <div class="field"><label>Status</label>
       <select id="pStatus"><option value="aberta">Aberta</option><option value="fechada">Fechada</option><option value="perdida">Perdida</option></select>
     </div>
-    <div class="field"><label>Origem</label><input type="text" id="pOrigem"></div>
+    <div class="field"><label>Origem</label>
+      <select id="pOrigem">
+        <option value="Lead Marketing">Lead Marketing</option>
+        <option value="Prospecção do Vendedor">Prospecção do Vendedor</option>
+      </select>
+    </div>
     <div class="field"><label>Observações</label><textarea id="pObs" rows="2"></textarea></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modalProposta')">Cancelar</button>
@@ -563,7 +573,7 @@ function openVendaModal(venda){
   document.getElementById('vVendedor').value = venda?.vendedor || currentProfile?.vendedor || vendedoresConhecidos[0] || '';
   document.getElementById('vOperadora').value = venda?.operadora || 'DoctorClin';
   document.getElementById('vParcela').value = venda?.parcela || '';
-  document.getElementById('vOrigem').value = venda?.origem || '';
+  document.getElementById('vOrigem').value = venda?.origem || 'Lead Marketing';
   document.getElementById('vObs').value = venda?.observacao || '';
   document.getElementById('vDeleteBtn').style.display = venda ? 'inline-block' : 'none';
   atualizarPreviewComissao();
@@ -724,7 +734,7 @@ function openPropostaModal(p){
   document.getElementById('pProbabilidade').value = p?.probabilidade ?? 50;
   document.getElementById('pPrevisao').value = p?.previsao_fechamento || '';
   document.getElementById('pStatus').value = p?.status || 'aberta';
-  document.getElementById('pOrigem').value = p?.origem || '';
+  document.getElementById('pOrigem').value = p?.origem || 'Lead Marketing';
   document.getElementById('pObs').value = p?.observacoes || '';
   document.getElementById('pDeleteBtn').style.display = p ? 'inline-block' : 'none';
   document.getElementById('modalProposta').classList.add('visible');
