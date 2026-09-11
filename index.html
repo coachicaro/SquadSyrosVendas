@@ -133,7 +133,8 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <div class="brand">Syros Financial<small>Planos de Saúde</small></div>
     <div class="nav-item active" data-view="dashboard" onclick="showView('dashboard')">📊 Dashboard</div>
     <div class="nav-item" data-view="analises" onclick="showView('analises')">📈 Análises</div>
-    <div class="nav-item" data-view="vendas" onclick="showView('vendas')">💰 Vendas</div>
+    <div class="nav-item" data-view="vendas" onclick="showView('vendas')">🧾 Vendas</div>
+    <div class="nav-item" data-view="producao" onclick="showView('producao')">💰 Produção</div>
     <div class="nav-item" data-view="metas" onclick="showView('metas')">🎯 Metas</div>
     <div class="nav-item" data-view="propostas" onclick="showView('propostas')">📄 Propostas</div>
     <div class="nav-item" data-view="origem" onclick="showView('origem')">🔗 Origem</div>
@@ -188,6 +189,17 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
           <th>Data</th><th>Cliente</th><th>Vendedor</th><th>Operadora</th><th>Categoria</th><th>Parcela</th><th>Com. Bruta</th><th>Com. Líquida</th><th>Origem</th><th></th>
         </tr></thead><tbody></tbody></table>
       </div>
+    </div>
+
+    <!-- PRODUÇÃO -->
+    <div id="view-producao" style="display:none">
+      <h1 class="page-title">Produção</h1>
+      <div class="page-sub">Expectativa de comissão a receber, calculada automaticamente sobre a comissão líquida da empresa</div>
+      <div class="row">
+        <select id="producaoMes" onchange="renderProducao()"></select>
+        <select id="producaoVendedorSel" onchange="renderProducao()" style="display:none"></select>
+      </div>
+      <div id="producaoConteudo"></div>
     </div>
 
     <!-- METAS -->
@@ -321,6 +333,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const CATEGORIA_MAP = { DoctorClin:'200', MedSenior:'200', Amil:'300', Bradesco:'300', SulAmerica:'300' };
 const MULT = { '200':2, '300':3 };
 const IMPOSTO = 0.11;
+const PRODUCAO_PCT = { '200':0.20, '300':0.25 }; // % da comissão líquida que vai pro vendedor
 const OPERADORA_LABEL = { DoctorClin:'DoctorClin', MedSenior:'MedSênior', Amil:'Amil', Bradesco:'Bradesco', SulAmerica:'SulAmérica' };
 
 let currentProfile = null;
@@ -374,6 +387,16 @@ async function afterLogin(user){
   document.getElementById('whoAmI').textContent = profile.nome + (profile.role==='gestor' ? ' · Gestor' : '');
   await carregarTudo();
   showView('dashboard');
+  setupRealtime();
+}
+function setupRealtime(){
+  sb.channel('vendas-realtime-channel')
+    .on('postgres_changes', {event:'*', schema:'public', table:'vendas'}, async ()=>{
+      await carregarTudo();
+      const ativo = document.querySelector('.nav-item.active')?.dataset.view;
+      if(ativo) showView(ativo);
+    })
+    .subscribe();
 }
 async function checkSession(){
   const {data:{session}} = await sb.auth.getSession();
@@ -403,7 +426,7 @@ function popularSelectsMes(){
   todasVendas.forEach(v=>meses.add((v.data||'').slice(0,7)));
   todasPropostas.forEach(v=>meses.add((v.data||'').slice(0,7)));
   const arr = [...meses].filter(Boolean).sort().reverse();
-  ['dashMes','filtroVendasMes','metaMes','origemMes','exportMes'].forEach(id=>{
+  ['dashMes','filtroVendasMes','metaMes','origemMes','exportMes','producaoMes'].forEach(id=>{
     const el=document.getElementById(id);
     const cur=el.value;
     el.innerHTML = arr.map(m=>`<option value="${m}">${mesLabel(m)}</option>`).join('');
@@ -416,6 +439,16 @@ function popularSelectsVendedor(){
   });
   const exp=document.getElementById('exportVendedor');
   exp.innerHTML = '<option value="">Todos</option>' + vendedoresConhecidos.map(v=>`<option value="${v}">${v}</option>`).join('');
+
+  const prodSel=document.getElementById('producaoVendedorSel');
+  if(currentProfile?.role==='gestor'){
+    const cur=prodSel.value;
+    prodSel.innerHTML = '<option value="">Todos (visão geral)</option>' + vendedoresConhecidos.map(v=>`<option value="${v}">${v}</option>`).join('');
+    prodSel.value = vendedoresConhecidos.includes(cur)?cur:'';
+    prodSel.style.display='inline-block';
+  } else {
+    prodSel.style.display='none';
+  }
 }
 
 /* ===== NAV ===== */
@@ -426,6 +459,7 @@ function showView(view){
   if(view==='dashboard') renderDashboard();
   if(view==='analises') renderAnalises();
   if(view==='vendas') renderVendasTable();
+  if(view==='producao') renderProducao();
   if(view==='metas') renderMetas();
   if(view==='propostas') renderPropostas();
   if(view==='origem') renderOrigem();
@@ -592,6 +626,65 @@ function renderVendasTable(){
       <td>${v.origem||'—'}</td>
       <td>✏️</td>
     </tr>`).join('');
+}
+
+/* ===== PRODUÇÃO (expectativa de comissão do vendedor) ===== */
+function calcProducaoPorVendedor(vendas, nomeVendedor){
+  const doVendedor = vendas.filter(v=>v.vendedor===nomeVendedor);
+  const g200 = doVendedor.filter(v=>v.categoria==='200');
+  const g300 = doVendedor.filter(v=>v.categoria==='300');
+  const liq200 = g200.reduce((s,v)=>s+(+v.comissao_liquida||0),0);
+  const liq300 = g300.reduce((s,v)=>s+(+v.comissao_liquida||0),0);
+  const prod200 = liq200 * PRODUCAO_PCT['200'];
+  const prod300 = liq300 * PRODUCAO_PCT['300'];
+  return { liq200, liq300, prod200, prod300, total: prod200+prod300, qtd200:g200.length, qtd300:g300.length, vendas: doVendedor };
+}
+function producaoColunasHTML(dados){
+  return `
+    <div class="grid-cards" style="margin-bottom:16px">
+      <div class="card stat-card"><div class="label">Expectativa total de comissão</div><div class="value">${fmtMoeda(dados.total)}</div></div>
+      <div class="card stat-card"><div class="label">DoctorClin / MedSênior · 20%</div><div class="value">${fmtMoeda(dados.prod200)}</div><div class="delta">${dados.qtd200} venda(s) · com. líq. empresa ${fmtMoeda(dados.liq200)}</div></div>
+      <div class="card stat-card"><div class="label">Amil / Bradesco / SulAmérica · 25%</div><div class="value">${fmtMoeda(dados.prod300)}</div><div class="delta">${dados.qtd300} venda(s) · com. líq. empresa ${fmtMoeda(dados.liq300)}</div></div>
+    </div>`;
+}
+function renderProducao(){
+  const mes = document.getElementById('producaoMes').value || mesAtualStr();
+  const vendas = vendasDoMes(mes);
+  const isGestor = currentProfile?.role==='gestor';
+  const alvoSelecionado = isGestor ? document.getElementById('producaoVendedorSel').value : currentProfile?.vendedor;
+
+  if(isGestor && !alvoSelecionado){
+    // Visão geral: tabela com todos os vendedores
+    const linhas = vendedoresConhecidos.map(nome=>{
+      const d = calcProducaoPorVendedor(vendas, nome);
+      return {nome, ...d};
+    }).sort((a,b)=>b.total-a.total);
+    const totalGeral = linhas.reduce((s,l)=>s+l.total,0);
+    document.getElementById('producaoConteudo').innerHTML = `
+      <div class="card stat-card" style="max-width:280px;margin-bottom:16px"><div class="label">Total esperado (todo o time)</div><div class="value">${fmtMoeda(totalGeral)}</div></div>
+      <div class="card" style="padding:0;overflow-x:auto">
+        <table><thead><tr><th>Vendedor</th><th>DoctorClin/MedSênior (20%)</th><th>Amil/Bradesco/SulAmérica (25%)</th><th>Total esperado</th></tr></thead>
+        <tbody>${linhas.map(l=>`<tr><td>${l.nome}</td><td>${fmtMoeda(l.prod200)}</td><td>${fmtMoeda(l.prod300)}</td><td><strong>${fmtMoeda(l.total)}</strong></td></tr>`).join('')}</tbody></table>
+      </div>`;
+    return;
+  }
+
+  if(!alvoSelecionado){ document.getElementById('producaoConteudo').innerHTML='<div class="empty">Vendedor não identificado no seu perfil.</div>'; return; }
+  const dados = calcProducaoPorVendedor(vendas, alvoSelecionado);
+  const listaHtml = dados.vendas.length ? `
+    <div class="card" style="padding:0;overflow-x:auto">
+      <table><thead><tr><th>Data</th><th>Cliente</th><th>Operadora</th><th>Categoria</th><th>Com. líquida (empresa)</th><th>Sua produção</th></tr></thead>
+      <tbody>${dados.vendas.map(v=>`<tr>
+        <td>${(v.data||'').split('-').reverse().join('/')}</td>
+        <td>${v.cliente||''}</td>
+        <td>${OPERADORA_LABEL[v.operadora]||v.operadora||''}</td>
+        <td><span class="badge badge-${v.categoria}">${v.categoria}%</span></td>
+        <td>${fmtMoeda(v.comissao_liquida)}</td>
+        <td><strong>${fmtMoeda((+v.comissao_liquida||0)*PRODUCAO_PCT[v.categoria])}</strong></td>
+      </tr>`).join('')}</tbody></table>
+    </div>` : '<div class="empty">Nenhuma venda sua neste mês ainda.</div>';
+
+  document.getElementById('producaoConteudo').innerHTML = producaoColunasHTML(dados) + listaHtml;
 }
 
 /* ===== METAS ===== */
