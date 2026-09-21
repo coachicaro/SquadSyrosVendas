@@ -255,6 +255,14 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
         <h3 style="margin-bottom:14px">Projeção por mês (parcelas com data prevista)</h3>
         <div id="financeiroProjecao"></div>
       </div>
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin-bottom:14px">Recebido x vendido por mês</h3>
+        <div id="financeiroBarChart"></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin-bottom:14px">Tempo médio de recebimento por operadora</h3>
+        <div id="financeiroTempoMedio"></div>
+      </div>
       <div class="row">
         <select id="financeiroFiltro" onchange="renderFinanceiro()">
           <option value="pendente">Pendentes</option>
@@ -943,6 +951,76 @@ function addDias(dataStr, dias){
   return d.toISOString().slice(0,10);
 }
 function fmtData(d){ return d ? d.split('-').reverse().join('/') : '—'; }
+function ultimosMeses(n){
+  const hoje=new Date(); const arr=[];
+  for(let i=n-1;i>=0;i--){ const d=new Date(hoje.getFullYear(),hoje.getMonth()-i,1); arr.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+  return arr;
+}
+function overlayBarChartSVG(data){
+  const W=680,H=260,padL=68,padR=20,padT=26,padB=42;
+  const innerW=W-padL-padR, innerH=H-padT-padB;
+  const max=Math.max(...data.map(d=>d.total),1);
+  const n=data.length||1;
+  const slot=innerW/n;
+  const barW=Math.min(56, slot*0.5);
+  const y = v => padT+innerH-(v/max)*innerH;
+
+  const gridLines=[0,0.25,0.5,0.75,1].map(f=>{
+    const yy=padT+innerH-f*innerH;
+    return `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="#DDE0EC" stroke-width="1"/>
+      <text x="${padL-8}" y="${yy+4}" text-anchor="end" font-size="10.5" fill="#9C9890" font-family="DM Sans, sans-serif">${fmtMoeda(max*f).replace('R$','').trim()}</text>`;
+  }).join('');
+
+  const bars = data.map((d,i)=>{
+    const cx = padL + slot*i + slot/2;
+    const x0 = cx - barW/2;
+    const yTotal = y(d.total);
+    const hTotal = Math.max(0, padT+innerH-yTotal);
+    const yReceb = y(d.recebido);
+    const hReceb = Math.max(0, padT+innerH-yReceb);
+    return `
+      <rect x="${x0}" y="${yTotal}" width="${barW}" height="${hTotal}" rx="4" fill="#C7CBDA"/>
+      <rect x="${x0}" y="${yReceb}" width="${barW}" height="${hReceb}" rx="4" fill="#2DB863"/>
+      ${d.total>0?`<text x="${cx}" y="${yTotal-8}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#5C5850" font-family="DM Sans, sans-serif">${fmtMoeda(d.total)}</text>`:''}
+      <text x="${cx}" y="${H-12}" text-anchor="middle" font-size="11.5" fill="#5C5850" font-family="DM Sans, sans-serif">${d.label}</text>
+    `;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:680px" xmlns="http://www.w3.org/2000/svg">
+    ${gridLines}${bars}
+  </svg>
+  <div style="display:flex;gap:18px;margin-top:6px;font-size:12px;color:var(--text-2)">
+    <span><span style="display:inline-block;width:10px;height:10px;background:#C7CBDA;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Total vendido (comissão líquida)</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#2DB863;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Já recebido</span>
+  </div>`;
+}
+function dadosRecebidoVsTotal(){
+  return ultimosMeses(6).map(m=>{
+    const total = vendasDoMes(m).reduce((s,v)=>s+(+v.comissao_liquida||0),0);
+    const recebido = todosRecebimentos
+      .filter(r=>r.data_recebido && r.venda?.data && (r.venda.data||'').slice(0,7)===m)
+      .reduce((s,r)=>s+(+r.valor||0),0);
+    return { label: mesLabel(m), total, recebido };
+  });
+}
+function tempoMedioPorOperadoraHTML(){
+  const grupos = {};
+  todosRecebimentos.forEach(r=>{
+    if(!r.data_recebido || !r.venda?.data) return;
+    const op = r.venda.operadora;
+    const dias = Math.round((new Date(r.data_recebido+'T00:00:00') - new Date(r.venda.data+'T00:00:00'))/86400000);
+    if(!grupos[op]) grupos[op] = {soma:0, qtd:0};
+    grupos[op].soma += dias; grupos[op].qtd += 1;
+  });
+  return Object.keys(OPERADORA_LABEL).map(op=>{
+    const g = grupos[op];
+    const media = g ? Math.round(g.soma/g.qtd) : null;
+    return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span>${OPERADORA_LABEL[op]}</span>
+      <strong>${media!==null ? media+' dias em média · '+g.qtd+' parcela'+(g.qtd>1?'s':'')+' recebida'+(g.qtd>1?'s':'') : 'Sem dados ainda'}</strong>
+    </div>`;
+  }).join('');
+}
 function renderFinanceiro(){
   if(currentProfile?.role!=='gestor'){ return; }
   const pendentes = todosRecebimentos.filter(r=>!r.data_recebido);
@@ -983,6 +1061,9 @@ function renderFinanceiro(){
       <span>${mesLabel(m)}</span><strong>${fmtMoeda(porMes[m])}</strong></div>`).join('');
   }
   document.getElementById('financeiroProjecao').innerHTML = projecaoHtml || '<div class="empty">Nenhuma parcela pendente no momento.</div>';
+
+  document.getElementById('financeiroBarChart').innerHTML = overlayBarChartSVG(dadosRecebidoVsTotal());
+  document.getElementById('financeiroTempoMedio').innerHTML = tempoMedioPorOperadoraHTML();
 
   // Tabela
   const filtro = document.getElementById('financeiroFiltro').value;
