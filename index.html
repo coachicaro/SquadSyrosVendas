@@ -256,7 +256,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
         <div id="financeiroProjecao"></div>
       </div>
       <div class="card" style="margin-bottom:16px">
-        <h3 style="margin-bottom:14px">Recebido x vendido por mês</h3>
+        <h3 style="margin-bottom:14px">Projeção de fluxo de caixa</h3>
         <div id="financeiroBarChart"></div>
       </div>
       <div class="card" style="margin-bottom:16px">
@@ -957,12 +957,12 @@ function ultimosMeses(n){
   return arr;
 }
 function overlayBarChartSVG(data){
-  const W=680,H=260,padL=68,padR=20,padT=26,padB=42;
+  const W=720,H=270,padL=68,padR=20,padT=26,padB=42;
   const innerW=W-padL-padR, innerH=H-padT-padB;
-  const max=Math.max(...data.map(d=>d.total),1);
+  const max=Math.max(...data.map(d=>d.recebido+d.previsto+d.atrasado),1);
   const n=data.length||1;
   const slot=innerW/n;
-  const barW=Math.min(56, slot*0.5);
+  const barW=Math.min(48, slot*0.5);
   const y = v => padT+innerH-(v/max)*innerH;
 
   const gridLines=[0,0.25,0.5,0.75,1].map(f=>{
@@ -971,36 +971,51 @@ function overlayBarChartSVG(data){
       <text x="${padL-8}" y="${yy+4}" text-anchor="end" font-size="10.5" fill="#9C9890" font-family="DM Sans, sans-serif">${fmtMoeda(max*f).replace('R$','').trim()}</text>`;
   }).join('');
 
+  const hojeYM = mesAtualStr();
   const bars = data.map((d,i)=>{
     const cx = padL + slot*i + slot/2;
     const x0 = cx - barW/2;
-    const yTotal = y(d.total);
-    const hTotal = Math.max(0, padT+innerH-yTotal);
-    const yReceb = y(d.recebido);
-    const hReceb = Math.max(0, padT+innerH-yReceb);
+    const total = d.recebido + d.previsto + d.atrasado;
+    // empilhado de baixo pra cima: recebido -> atrasado -> previsto
+    const yBase = padT+innerH;
+    const hReceb = (d.recebido/max)*innerH;
+    const hAtraso = (d.atrasado/max)*innerH;
+    const hPrev = (d.previsto/max)*innerH;
+    const yRecebTop = yBase - hReceb;
+    const yAtrasoTop = yRecebTop - hAtraso;
+    const yPrevTop = yAtrasoTop - hPrev;
+    const isMesAtual = d.ym === hojeYM;
     return `
-      <rect x="${x0}" y="${yTotal}" width="${barW}" height="${hTotal}" rx="4" fill="#C7CBDA"/>
-      <rect x="${x0}" y="${yReceb}" width="${barW}" height="${hReceb}" rx="4" fill="#2DB863"/>
-      ${d.total>0?`<text x="${cx}" y="${yTotal-8}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#5C5850" font-family="DM Sans, sans-serif">${fmtMoeda(d.total)}</text>`:''}
-      <text x="${cx}" y="${H-12}" text-anchor="middle" font-size="11.5" fill="#5C5850" font-family="DM Sans, sans-serif">${d.label}</text>
+      ${hReceb>0?`<rect x="${x0}" y="${yRecebTop}" width="${barW}" height="${hReceb}" rx="3" fill="#2DB863"/>`:''}
+      ${hAtraso>0?`<rect x="${x0}" y="${yAtrasoTop}" width="${barW}" height="${hAtraso}" rx="3" fill="#C0392B"/>`:''}
+      ${hPrev>0?`<rect x="${x0}" y="${yPrevTop}" width="${barW}" height="${hPrev}" rx="3" fill="#4A5899"/>`:''}
+      ${total>0?`<text x="${cx}" y="${yPrevTop-8}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#5C5850" font-family="DM Sans, sans-serif">${fmtMoeda(total)}</text>`:''}
+      <text x="${cx}" y="${H-12}" text-anchor="middle" font-size="11.5" font-weight="${isMesAtual?'700':'400'}" fill="${isMesAtual?'#2A3568':'#5C5850'}" font-family="DM Sans, sans-serif">${d.label}</text>
     `;
   }).join('');
 
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:680px" xmlns="http://www.w3.org/2000/svg">
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:720px" xmlns="http://www.w3.org/2000/svg">
     ${gridLines}${bars}
   </svg>
-  <div style="display:flex;gap:18px;margin-top:6px;font-size:12px;color:var(--text-2)">
-    <span><span style="display:inline-block;width:10px;height:10px;background:#C7CBDA;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Total vendido (comissão líquida)</span>
-    <span><span style="display:inline-block;width:10px;height:10px;background:#2DB863;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Já recebido</span>
+  <div style="display:flex;gap:18px;margin-top:6px;flex-wrap:wrap;font-size:12px;color:var(--text-2)">
+    <span><span style="display:inline-block;width:10px;height:10px;background:#2DB863;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Recebido</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#4A5899;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Previsto (a receber)</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#C0392B;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Atrasado (passou do prazo)</span>
   </div>`;
 }
-function dadosRecebidoVsTotal(){
-  return ultimosMeses(6).map(m=>{
-    const total = vendasDoMes(m).reduce((s,v)=>s+(+v.comissao_liquida||0),0);
+function dadosFluxoCaixa(){
+  const meses = [];
+  const hoje = new Date();
+  for(let i=-3;i<=3;i++){ const d=new Date(hoje.getFullYear(),hoje.getMonth()+i,1); meses.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+  const hojeStr = hoje.toISOString().slice(0,10);
+  return meses.map(m=>{
     const recebido = todosRecebimentos
-      .filter(r=>r.data_recebido && r.venda?.data && (r.venda.data||'').slice(0,7)===m)
+      .filter(r=>r.data_recebido && (r.data_recebido||'').slice(0,7)===m)
       .reduce((s,r)=>s+(+r.valor||0),0);
-    return { label: mesLabel(m), total, recebido };
+    const pendentesDoMes = todosRecebimentos.filter(r=>!r.data_recebido && r.data_prevista && (r.data_prevista||'').slice(0,7)===m);
+    const atrasado = pendentesDoMes.filter(r=>r.data_prevista < hojeStr).reduce((s,r)=>s+(+r.valor||0),0);
+    const previsto = pendentesDoMes.filter(r=>r.data_prevista >= hojeStr).reduce((s,r)=>s+(+r.valor||0),0);
+    return { ym:m, label: mesLabel(m), recebido, previsto, atrasado };
   });
 }
 function tempoMedioPorOperadoraHTML(){
@@ -1062,7 +1077,7 @@ function renderFinanceiro(){
   }
   document.getElementById('financeiroProjecao').innerHTML = projecaoHtml || '<div class="empty">Nenhuma parcela pendente no momento.</div>';
 
-  document.getElementById('financeiroBarChart').innerHTML = overlayBarChartSVG(dadosRecebidoVsTotal());
+  document.getElementById('financeiroBarChart').innerHTML = overlayBarChartSVG(dadosFluxoCaixa());
   document.getElementById('financeiroTempoMedio').innerHTML = tempoMedioPorOperadoraHTML();
 
   // Tabela
