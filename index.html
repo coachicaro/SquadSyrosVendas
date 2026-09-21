@@ -220,6 +220,20 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
       <h1 class="page-title">Propostas</h1>
       <div class="page-sub">Pipeline — abertas, fechadas e perdidas</div>
       <div class="grid-cards" id="propostaCards"></div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="row" style="justify-content:space-between;margin-bottom:14px">
+          <h3>Funil comercial</h3>
+          <select id="funilMes" onchange="renderPropostas()"></select>
+        </div>
+        <div id="funilVisual"></div>
+      </div>
+      <div class="card" style="padding:0;overflow-x:auto;margin-bottom:16px">
+        <table id="tabelaFunilVendedor"><thead><tr>
+          <th>Vendedor</th><th>Abertas</th><th>Fechadas</th><th>Perdidas</th><th>Taxa de conversão</th><th>Ticket médio (com. líq.)</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+
       <div class="row">
         <button class="btn btn-primary" style="width:auto" onclick="openPropostaModal()">+ Nova proposta</button>
         <select id="filtroPropostaStatus" onchange="renderPropostas()">
@@ -488,6 +502,7 @@ async function carregarTudo(){
   vendedoresConhecidos = [...setV].sort();
   popularSelectsMes();
   popularSelectsVendedor();
+  popularFunilMes();
 
   if(currentProfile?.role==='gestor'){
     const {data:r} = await sb.from('recebimentos').select('*, venda:vendas(cliente,vendedor,operadora,data)').order('data_prevista',{ascending:true,nullsFirst:false});
@@ -859,6 +874,11 @@ async function salvarProposta(){
   const cliente = document.getElementById('pCliente').value.trim();
   if(!cliente){ showToast('Informe o cliente.','error'); return; }
   const operadora = document.getElementById('pOperadora').value;
+  const status = document.getElementById('pStatus').value;
+  const propostaAnterior = id ? todasPropostas.find(p=>p.id===id) : null;
+  let data_encerramento = propostaAnterior?.data_encerramento || null;
+  if(status!=='aberta' && !data_encerramento){ data_encerramento = new Date().toISOString().slice(0,10); }
+  if(status==='aberta'){ data_encerramento = null; }
   const payload = {
     cliente, data:document.getElementById('pData').value,
     vendedor:document.getElementById('pVendedor').value,
@@ -866,7 +886,7 @@ async function salvarProposta(){
     parcela: parseFloat(document.getElementById('pParcela').value)||0,
     probabilidade: parseInt(document.getElementById('pProbabilidade').value)||0,
     previsao_fechamento: document.getElementById('pPrevisao').value || null,
-    status: document.getElementById('pStatus').value,
+    status, data_encerramento,
     origem: document.getElementById('pOrigem').value.trim() || null,
     observacoes: document.getElementById('pObs').value.trim() || null
   };
@@ -893,7 +913,64 @@ async function excluirProposta(){
   await carregarTudo();
   renderPropostas();
 }
+function popularFunilMes(){
+  const meses = new Set();
+  todasPropostas.forEach(p=>meses.add((p.data||'').slice(0,7)));
+  const arr = [...meses].filter(Boolean).sort().reverse();
+  const el = document.getElementById('funilMes');
+  const cur = el.value;
+  el.innerHTML = '<option value="">Todos os períodos</option>' + arr.map(m=>`<option value="${m}">${mesLabel(m)}</option>`).join('');
+  el.value = arr.includes(cur) ? cur : '';
+}
+function funilBarraHTML(label, valor, max, cor){
+  const pct = max>0 ? (valor/max)*100 : 0;
+  return `<div style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px">
+      <span style="font-weight:500">${label}</span><span style="color:var(--text-2)">${valor} (${pct.toFixed(0)}%)</span>
+    </div>
+    <div style="height:26px;background:var(--bg);border-radius:6px;overflow:hidden">
+      <div style="height:100%;width:${Math.max(pct,valor>0?4:0)}%;background:${cor};border-radius:6px"></div>
+    </div>
+  </div>`;
+}
+function renderFunil(){
+  const mes = document.getElementById('funilMes').value;
+  const lista = mes ? todasPropostas.filter(p=>(p.data||'').slice(0,7)===mes) : todasPropostas;
+
+  const total = lista.length;
+  const fechadas = lista.filter(p=>p.status==='fechada');
+  const perdidas = lista.filter(p=>p.status==='perdida');
+  const abertas = lista.filter(p=>p.status==='aberta');
+  const encerradas = fechadas.length + perdidas.length;
+  const taxaConversaoEncerradas = encerradas>0 ? (fechadas.length/encerradas*100) : 0;
+
+  document.getElementById('funilVisual').innerHTML = total===0 ? '<div class="empty">Nenhuma proposta neste período.</div>' : `
+    ${funilBarraHTML('Total de propostas', total, total, '#2A3568')}
+    ${funilBarraHTML('Encerradas (fechadas + perdidas)', encerradas, total, '#4A5899')}
+    ${funilBarraHTML('Fechadas (ganhas)', fechadas.length, total, '#2DB863')}
+    <div class="hint" style="margin-top:4px">Taxa de conversão entre encerradas: <strong>${taxaConversaoEncerradas.toFixed(1)}%</strong> · Ainda em aberto: <strong>${abertas.length}</strong></div>
+  `;
+
+  const linhas = vendedoresConhecidos.map(nome=>{
+    const doVendedor = lista.filter(p=>p.vendedor===nome);
+    const ab = doVendedor.filter(p=>p.status==='aberta').length;
+    const fe = doVendedor.filter(p=>p.status==='fechada');
+    const pe = doVendedor.filter(p=>p.status==='perdida').length;
+    const enc = fe.length + pe;
+    const taxa = enc>0 ? (fe.length/enc*100) : null;
+    const ticketMedio = fe.length ? fe.reduce((s,p)=>s+calcComissao(p.parcela,p.operadora).liquida,0)/fe.length : 0;
+    return {nome, ab, fe:fe.length, pe, taxa, ticketMedio, temDados: doVendedor.length>0};
+  }).filter(l=>l.temDados);
+
+  const tbody = document.querySelector('#tabelaFunilVendedor tbody');
+  tbody.innerHTML = linhas.length ? linhas.map(l=>`<tr>
+    <td>${l.nome}</td><td>${l.ab}</td><td>${l.fe}</td><td>${l.pe}</td>
+    <td>${l.taxa!==null ? l.taxa.toFixed(1)+'%' : '—'}</td>
+    <td>${l.fe>0 ? fmtMoeda(l.ticketMedio) : '—'}</td>
+  </tr>`).join('') : '<tr><td colspan="6" class="empty">Nenhuma proposta neste período.</td></tr>';
+}
 function renderPropostas(){
+  renderFunil();
   const statusFiltro = document.getElementById('filtroPropostaStatus').value;
   const lista = statusFiltro ? todasPropostas.filter(p=>p.status===statusFiltro) : todasPropostas;
 
