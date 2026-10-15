@@ -78,6 +78,39 @@ main{flex:1;padding:28px 32px;max-width:1400px}
 .progress-bar{height:7px;background:var(--bg);border-radius:99px;overflow:hidden;margin-top:6px}
 .progress-fill{height:100%;background:var(--green);border-radius:99px;transition:width .3s}
 .progress-fill.over{background:var(--gold)}
+.prop-card{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;cursor:pointer;background:var(--surface);transition:.15s}
+.prop-card:hover{border-color:var(--border-strong);box-shadow:var(--shadow)}
+.prop-card.quente{border-color:#F2D9A3;background:linear-gradient(90deg,#FFF9EC 0%,#fff 60%)}
+.pc-main{min-width:0;flex:1}
+.pc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pc-name{font-weight:600;font-size:15px}
+.pc-fire{font-size:16px}
+.pc-sub{font-size:12.5px;color:var(--text-2);margin-top:3px}
+.pc-fu{font-size:12px;font-weight:600;margin-top:5px}
+.fu-late{color:var(--danger)} .fu-today{color:#B8741A} .fu-ok{color:var(--green-dark)} .fu-none{color:var(--text-3);font-weight:500}
+.pc-money{text-align:right;flex-shrink:0}
+.pc-money-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);font-weight:600}
+.pc-money-val{font-family:'DM Serif Display',serif;font-size:22px;color:var(--green-dark)}
+.pc-money-sub{font-size:11px;color:var(--text-3)}
+.camp-card{background:linear-gradient(135deg,#FFF9EC 0%,#fff 70%);border:1px solid #F2D9A3;border-radius:var(--radius);padding:16px 20px;margin-bottom:12px}
+.camp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.camp-name{font-family:'DM Serif Display',serif;font-size:19px;color:var(--accent)}
+.camp-prize{font-size:13px;color:#8A5A0B;font-weight:600;margin-top:2px}
+.camp-days{font-size:12px;color:var(--text-2);text-align:right}
+.camp-row{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:13px}
+.camp-row .cr-n{width:110px;flex-shrink:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.camp-row .cr-bar{flex:1;height:9px;background:var(--bg);border-radius:99px;overflow:hidden}
+.camp-row .cr-fill{height:100%;background:var(--green);border-radius:99px}
+.camp-row .cr-fill.gold{background:var(--gold)}
+.camp-row .cr-v{width:150px;text-align:right;color:var(--text-2);font-size:12px;flex-shrink:0}
+.funnel-step{margin-bottom:6px}
+.funnel-conv{font-size:11.5px;color:var(--text-3);margin:2px 0 8px 14px}
+@media(max-width:600px){.camp-row .cr-n{width:80px}.camp-row .cr-v{width:100px}}
+@media(max-width:900px){.sidebar{overflow-x:auto}.nav-item{min-width:62px}}
+.badge-etapa-nova{background:var(--accent-light);color:var(--accent-text)}
+.badge-etapa-apresentada{background:#FFF3DA;color:#8A5A0B}
+.badge-etapa-negociacao{background:#E3F5EA;color:var(--green-dark)}
+@media(max-width:600px){.prop-card{flex-direction:column;align-items:flex-start}.pc-money{text-align:left}}
 
 /* ===== PÓDIO ===== */
 .podium-stage{background:linear-gradient(160deg,#2A3568 0%,#1f2854 100%);border-radius:var(--radius);padding:34px 24px 0;margin-bottom:18px;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}
@@ -188,6 +221,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <div class="nav-item" data-view="propostas" onclick="showView('propostas')">📄 Propostas</div>
     <div class="nav-item" data-view="origem" onclick="showView('origem')">🔗 Origem</div>
     <div class="nav-item" id="navFinanceiro" data-view="financeiro" onclick="showView('financeiro')" style="display:none">🏦 Financeiro</div>
+    <div class="nav-item" id="navLeads" data-view="leads" onclick="showView('leads')" style="display:none">🧲 Leads</div>
     <div class="nav-item" data-view="exportar" onclick="showView('exportar')">📤 Exportar</div>
     <div class="sidebar-footer">
       <div class="who" id="whoAmI">—</div>
@@ -204,6 +238,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
         <select id="dashMes" onchange="renderDashboard()"></select>
       </div>
       <div class="grid-cards" id="dashCards"></div>
+      <div id="dashCampanhas"></div>
       <div id="dashRanking"></div>
     </div>
 
@@ -260,13 +295,60 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
         <select id="metaMes" onchange="renderMetas()"></select>
       </div>
       <div class="card" id="metasCard"></div>
+
+      <div id="campanhasAdmin" style="display:none;margin-top:28px">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px">
+          <div><h3>Campanhas</h3><div class="hint" style="margin:2px 0 0">Prêmios para o time. O progresso aparece no Dashboard de todos. Conta a comissão líquida da empresa vendida no período.</div></div>
+          <button class="btn btn-primary" style="width:auto" onclick="openCampanhaModal()">+ Nova campanha</button>
+        </div>
+        <div id="campanhasLista"></div>
+      </div>
+    </div>
+
+    <!-- LEADS -->
+    <div id="view-leads" style="display:none">
+      <h1 class="page-title">Leads</h1>
+      <div class="page-sub">Funil semanal do canal de marketing — da geração ao fechamento</div>
+      <div class="row"><select id="leadsPeriodo" onchange="renderLeads()">
+        <option value="4">Últimas 4 semanas</option><option value="8">Últimas 8 semanas</option><option value="12">Últimas 12 semanas</option><option value="0">Tudo</option>
+      </select></div>
+      <div class="grid-cards" id="leadsCards"></div>
+      <div class="card" style="margin-bottom:16px"><h3 style="margin-bottom:14px">Funil do período</h3><div id="leadsFunil"></div></div>
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin-bottom:4px">Lançar semana</h3>
+        <div class="hint" style="margin:0 0 14px">Informe os números do relatório da semana. Lançar a mesma semana de novo atualiza os valores.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px">
+          <div class="field" style="margin:0"><label>Semana (qualquer dia)</label><input type="date" id="lfSemana" onchange="aoMudarSemanaLeads()"></div>
+          <div class="field" style="margin:0"><label>Leads gerados</label><input type="number" min="0" id="lfLeads"></div>
+          <div class="field" style="margin:0"><label>Qualificados</label><input type="number" min="0" id="lfQual"></div>
+          <div class="field" style="margin:0"><label>Agendados</label><input type="number" min="0" id="lfAgend"></div>
+          <div class="field" style="margin:0"><label>Propostas</label><input type="number" min="0" id="lfProp"></div>
+          <div class="field" style="margin:0"><label>Fechamentos</label><input type="number" min="0" id="lfFech"></div>
+        </div>
+        <div class="row" style="margin:14px 0 0">
+          <button class="btn btn-primary" style="width:auto" onclick="salvarFunilSemana()">Salvar semana</button>
+          <button class="btn" onclick="preencherPropostasFechamentos()">Preencher propostas e fechamentos pelo sistema</button>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow-x:auto">
+        <table id="tabelaLeads"><thead><tr><th>Semana</th><th>Leads</th><th>Qualificados</th><th>Agendados</th><th>Propostas</th><th>Fechamentos</th><th>Lead → venda</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
     </div>
 
     <!-- PROPOSTAS -->
     <div id="view-propostas" style="display:none">
       <h1 class="page-title">Propostas</h1>
-      <div class="page-sub">Pipeline — abertas, fechadas e perdidas</div>
+      <div class="page-sub">O que está em jogo agora — e o que fazer primeiro</div>
+      <div class="row" id="prioVendedorRow" style="display:none">
+        <select id="prioVendedor" onchange="renderPropostas()"></select>
+      </div>
       <div class="grid-cards" id="propostaCards"></div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin-bottom:4px">Propostas para trabalhar</h3>
+        <div class="hint" style="margin:0 0 14px">Ordenadas por dinheiro em jogo e estágio. As 3 com 🔥 são as primeiras a atacar.</div>
+        <div id="propostasPrioridade"></div>
+      </div>
 
       <div class="card" style="margin-bottom:16px">
         <div class="row" style="justify-content:space-between;margin-bottom:14px">
@@ -292,7 +374,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
       </div>
       <div class="card" style="padding:0;overflow-x:auto">
         <table id="tabelaPropostas"><thead><tr>
-          <th>Data</th><th>Cliente</th><th>Vendedor</th><th>Operadora</th><th>Parcela</th><th>Prob.</th><th>Previsão</th><th>Status</th><th></th>
+          <th>Data</th><th>Cliente</th><th>Vendedor</th><th>Operadora</th><th>Mensalidade</th><th>Etapa</th><th>Follow-up</th><th>Status</th><th></th>
         </tr></thead><tbody></tbody></table>
       </div>
     </div>
@@ -319,6 +401,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
       <div class="card" style="margin-bottom:16px">
         <h3 style="margin-bottom:14px">Projeção de fluxo de caixa</h3>
         <div id="financeiroBarChart"></div>
+        <div id="financeiroConversao" style="margin-top:14px"></div>
       </div>
       <div class="card" style="margin-bottom:16px">
         <h3 style="margin-bottom:14px">Tempo médio de recebimento por operadora</h3>
@@ -403,7 +486,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <div class="field"><label>Data</label><input type="date" id="pData"></div>
     <div class="field"><label>Vendedor</label><select id="pVendedor"></select></div>
     <div class="field"><label>Operadora</label>
-      <select id="pOperadora">
+      <select id="pOperadora" onchange="atualizarPreviewProposta()">
         <option value="DoctorClin">DoctorClin (200%)</option>
         <option value="MedSenior">MedSênior (200%)</option>
         <option value="Amil">Amil (300%)</option>
@@ -411,11 +494,17 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
         <option value="SulAmerica">SulAmérica (300%)</option>
       </select>
     </div>
-    <div class="field"><label>Parcela estimada (R$)</label><input type="number" step="0.01" id="pParcela"></div>
-    <div class="field"><label>Probabilidade de fechamento (%)</label><input type="number" min="0" max="100" id="pProbabilidade" value="50"></div>
-    <div class="field"><label>Previsão de fechamento</label><input type="date" id="pPrevisao"></div>
+    <div class="field"><label>Mensalidade do cliente (R$)</label><input type="number" step="0.01" id="pParcela" oninput="atualizarPreviewProposta()"></div>
+    <div class="hint" id="pPreview" style="margin:-8px 0 14px"></div>
     <div class="field"><label>Status</label>
-      <select id="pStatus"><option value="aberta">Aberta</option><option value="fechada">Fechada</option><option value="perdida">Perdida</option></select>
+      <select id="pStatus" onchange="atualizarCamposEtapa()"><option value="aberta">Em aberto</option><option value="fechada">Fechada (ganha)</option><option value="perdida">Perdida</option></select>
+    </div>
+    <div id="pEtapaWrap">
+      <div class="field"><label>Etapa</label>
+        <select id="pEtapa" onchange="aoMudarEtapa()"><option value="nova">Nova</option><option value="apresentada">Apresentada</option><option value="negociacao">Em negociação</option></select>
+      </div>
+      <div class="field"><label>Próximo follow-up</label><input type="date" id="pFollowup"></div>
+      <div class="field"><label>Previsão de fechamento</label><input type="date" id="pPrevisao"></div>
     </div>
     <div class="field"><label>Origem</label>
       <select id="pOrigem">
@@ -433,6 +522,32 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- MODAL CAMPANHA -->
+<div class="modal-overlay" id="modalCampanha">
+  <div class="modal">
+    <h2 id="modalCampanhaTitle">Nova campanha</h2>
+    <input type="hidden" id="campId">
+    <div class="field"><label>Nome da campanha</label><input type="text" id="campNome" placeholder="Ex: Meta de Outubro"></div>
+    <div class="field"><label>Prêmio</label><input type="text" id="campPremio" placeholder="Ex: iPhone 16"></div>
+    <div class="field"><label>Como se ganha</label>
+      <select id="campTipo" onchange="atualizarCampoMetaCampanha()">
+        <option value="meta_time">Meta do time (todos ganham se o time bater)</option>
+        <option value="meta_individual">Meta individual (quem bater a meta ganha)</option>
+        <option value="ranking">Quem mais vender leva</option>
+      </select>
+    </div>
+    <div class="field" id="campMetaWrap"><label>Meta de comissão líquida (R$)</label><input type="number" step="0.01" id="campMeta"></div>
+    <div class="field"><label>Início</label><input type="date" id="campInicio"></div>
+    <div class="field"><label>Fim</label><input type="date" id="campFim"></div>
+    <div class="field"><label>Situação</label><select id="campAtiva"><option value="true">Ativa</option><option value="false">Encerrada</option></select></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modalCampanha')">Cancelar</button>
+      <button class="btn btn-danger" id="campDeleteBtn" style="display:none" onclick="excluirCampanha()">Excluir</button>
+      <button class="btn btn-primary" style="width:auto" onclick="salvarCampanha()">Salvar</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL RECEBIMENTO -->
 <div class="modal-overlay" id="modalRecebimento">
@@ -461,10 +576,16 @@ const CATEGORIA_MAP = { DoctorClin:'200', MedSenior:'200', Amil:'300', Bradesco:
 const MULT = { '200':2, '300':3 };
 const IMPOSTO = 0.11;
 const PRODUCAO_PCT = { '200':0.20, '300':0.25 }; // % da comissão líquida que vai pro vendedor
+const CONV_PADRAO = 0.30;      // taxa de conversão assumida enquanto não há histórico
+const MIN_ENCERRADAS = 5;      // mínimo de propostas encerradas para confiar na taxa real
+const ETAPAS = { nova:'Nova', apresentada:'Apresentada', negociacao:'Em negociação' };
+const PESO_ETAPA = { nova:0.4, apresentada:0.7, negociacao:1 };
+function hojeStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function diffDias(a,b){ return Math.round((new Date(a+'T00:00:00')-new Date(b+'T00:00:00'))/86400000); }
 const OPERADORA_LABEL = { DoctorClin:'DoctorClin', MedSenior:'MedSênior', Amil:'Amil', Bradesco:'Bradesco', SulAmerica:'SulAmérica' };
 
 let currentProfile = null;
-let todasVendas = [], todasMetas = [], todasPropostas = [], todosRecebimentos = [];
+let todasVendas = [], todasMetas = [], todasPropostas = [], todosRecebimentos = [], todasCampanhas = [], todoFunilSemanal = [];
 let vendedoresConhecidos = [];
 
 function calcComissao(parcela, operadora){
@@ -513,6 +634,7 @@ async function afterLogin(user){
   document.getElementById('app').classList.add('visible');
   document.getElementById('whoAmI').textContent = profile.nome + (profile.role==='gestor' ? ' · Gestor' : '');
   document.getElementById('navFinanceiro').style.display = profile.role==='gestor' ? 'flex' : 'none';
+  document.getElementById('navLeads').style.display = profile.role==='gestor' ? 'flex' : 'none';
   await carregarTudo();
   showView('dashboard');
   setupRealtime();
@@ -551,9 +673,13 @@ async function carregarTudo(){
   popularSelectsVendedor();
   popularFunilMes();
 
+  const {data:r} = await sb.from('recebimentos').select('*, venda:vendas(cliente,vendedor,operadora,data)').order('data_prevista',{ascending:true,nullsFirst:false});
+  todosRecebimentos = r||[];
+  const {data:camp} = await sb.from('campanhas').select('*').order('data_fim',{ascending:true});
+  todasCampanhas = camp||[];
   if(currentProfile?.role==='gestor'){
-    const {data:r} = await sb.from('recebimentos').select('*, venda:vendas(cliente,vendedor,operadora,data)').order('data_prevista',{ascending:true,nullsFirst:false});
-    todosRecebimentos = r||[];
+    const {data:fs} = await sb.from('funil_semanal').select('*').order('semana_inicio',{ascending:false});
+    todoFunilSemanal = fs||[];
   }
 }
 
@@ -600,6 +726,7 @@ function showView(view){
   if(view==='propostas') renderPropostas();
   if(view==='origem') renderOrigem();
   if(view==='financeiro') renderFinanceiro();
+  if(view==='leads') renderLeads();
 }
 
 function vendasDoMes(mes){ return todasVendas.filter(v=>(v.data||'').slice(0,7)===mes); }
@@ -612,6 +739,7 @@ function renderDashboard(){
   const totalBruta = vendas.reduce((s,v)=>s+(+v.comissao_bruta||0),0);
   const totalVendas = vendas.length;
 
+  renderCampanhasDash();
   document.getElementById('dashCards').innerHTML = `
     <div class="card stat-card"><div class="label">Comissão líquida (mês)</div><div class="value">${fmtMoeda(totalLiquida)}</div></div>
     <div class="card stat-card"><div class="label">Comissão bruta (mês)</div><div class="value">${fmtMoeda(totalBruta)}</div></div>
@@ -689,6 +817,208 @@ function podiumHTML(ranked, metasDoMes){
   }).join('');
 
   return podium + restoHTML;
+}
+
+
+/* ===== CAMPANHAS ===== */
+function campanhaAtiva(cp){ const h=hojeStr(); return cp.ativa && cp.data_inicio<=h && h<=cp.data_fim; }
+function progressoCampanha(cp){
+  const vendas = todasVendas.filter(v=>v.data>=cp.data_inicio && v.data<=cp.data_fim);
+  const porV = {};
+  vendedoresConhecidos.forEach(n=>porV[n]=0);
+  vendas.forEach(v=>{ porV[v.vendedor]=(porV[v.vendedor]||0)+(+v.comissao_liquida||0); });
+  const total = Object.values(porV).reduce((s,x)=>s+x,0);
+  return { porV, total, ranking: Object.entries(porV).sort((a,b)=>b[1]-a[1]) };
+}
+function campanhaCardHTML(cp){
+  const pr = progressoCampanha(cp);
+  const diasRest = diffDias(cp.data_fim, hojeStr());
+  const tipoTxt = {meta_time:'Meta do time', meta_individual:'Meta individual', ranking:'Quem mais vender leva'}[cp.tipo];
+  let corpo = '';
+  const linha = (nome, val, pct, gold)=>`<div class="camp-row"><div class="cr-n">${escHtml(nome)}</div><div class="cr-bar"><div class="cr-fill ${gold?'gold':''}" style="width:${pct}%"></div></div><div class="cr-v">${fmtMoeda(val)}${cp.meta_valor>0&&cp.tipo!=='ranking'?` · ${pct.toFixed(0)}%`:''}</div></div>`;
+  if(cp.tipo==='meta_time'){
+    const pct = cp.meta_valor>0 ? Math.min(100,pr.total/cp.meta_valor*100) : 0;
+    corpo = linha('Time', pr.total, pct, pr.total>=cp.meta_valor) + `<div class="hint" style="margin-top:6px">${pr.total>=cp.meta_valor?'🎉 Meta batida! Todo mundo ganha.':`Faltam ${fmtMoeda(Math.max(0,cp.meta_valor-pr.total))} para o time bater a meta de ${fmtMoeda(cp.meta_valor)}.`}</div>`;
+  } else if(cp.tipo==='meta_individual'){
+    corpo = pr.ranking.map(([n,v])=>{ const pct = cp.meta_valor>0?Math.min(100,v/cp.meta_valor*100):0; return linha(n, v, pct, v>=cp.meta_valor); }).join('')
+      + `<div class="hint" style="margin-top:6px">Meta por pessoa: ${fmtMoeda(cp.meta_valor)}</div>`;
+  } else {
+    const top = pr.ranking.filter(([,v])=>v>0).slice(0,3);
+    const max = top.length ? top[0][1] : 0;
+    corpo = top.length ? top.map(([n,v],i)=>linha(`${['🥇','🥈','🥉'][i]} ${n}`, v, max>0?v/max*100:0, i===0)).join('') : '<div class="hint">Ninguém vendeu no período ainda. A liderança está aberta.</div>';
+  }
+  return `<div class="camp-card">
+    <div class="camp-head">
+      <div><div class="camp-name">${escHtml(cp.nome)}</div><div class="camp-prize">🎁 ${escHtml(cp.premio)} · ${tipoTxt}</div></div>
+      <div class="camp-days">${diasRest<0?'Encerrada':diasRest===0?'Último dia!':`${diasRest} dia${diasRest>1?'s':''} restante${diasRest>1?'s':''}`}<br>até ${cp.data_fim.split('-').reverse().join('/')}</div>
+    </div>${corpo}</div>`;
+}
+function renderCampanhasDash(){
+  const ativas = todasCampanhas.filter(campanhaAtiva);
+  document.getElementById('dashCampanhas').innerHTML = ativas.map(campanhaCardHTML).join('');
+}
+function renderCampanhasAdmin(){
+  const wrap = document.getElementById('campanhasAdmin');
+  const isGestor = currentProfile?.role==='gestor';
+  wrap.style.display = isGestor ? 'block' : 'none';
+  if(!isGestor) return;
+  document.getElementById('campanhasLista').innerHTML = todasCampanhas.length ? todasCampanhas.map(cp=>`
+    <div style="position:relative;cursor:pointer" onclick='openCampanhaModal(${JSON.stringify(cp).replace(/'/g,"&apos;")})'>
+      ${campanhaCardHTML(cp)}
+      <span class="badge ${campanhaAtiva(cp)?'badge-fechada':'badge-perdida'}" style="position:absolute;right:14px;bottom:14px">${campanhaAtiva(cp)?'No ar':(cp.ativa?(cp.data_inicio>hojeStr()?'Agendada':'Fora do prazo'):'Encerrada')} · editar</span>
+    </div>`).join('') : '<div class="empty">Nenhuma campanha ainda. Crie a primeira para motivar o time.</div>';
+}
+function atualizarCampoMetaCampanha(){
+  document.getElementById('campMetaWrap').style.display = document.getElementById('campTipo').value==='ranking' ? 'none' : 'block';
+}
+function openCampanhaModal(cp){
+  document.getElementById('modalCampanhaTitle').textContent = cp ? 'Editar campanha' : 'Nova campanha';
+  document.getElementById('campId').value = cp?.id || '';
+  document.getElementById('campNome').value = cp?.nome || '';
+  document.getElementById('campPremio').value = cp?.premio || '';
+  document.getElementById('campTipo').value = cp?.tipo || 'meta_time';
+  document.getElementById('campMeta').value = cp?.meta_valor || '';
+  const h = hojeStr();
+  document.getElementById('campInicio').value = cp?.data_inicio || h.slice(0,8)+'01';
+  const d = new Date(); const fimMes = new Date(d.getFullYear(), d.getMonth()+1, 0);
+  document.getElementById('campFim').value = cp?.data_fim || `${fimMes.getFullYear()}-${String(fimMes.getMonth()+1).padStart(2,'0')}-${String(fimMes.getDate()).padStart(2,'0')}`;
+  document.getElementById('campAtiva').value = String(cp?.ativa ?? true);
+  document.getElementById('campDeleteBtn').style.display = cp ? 'inline-block' : 'none';
+  atualizarCampoMetaCampanha();
+  document.getElementById('modalCampanha').classList.add('visible');
+}
+async function salvarCampanha(){
+  const id = document.getElementById('campId').value;
+  const tipo = document.getElementById('campTipo').value;
+  const meta = parseFloat(document.getElementById('campMeta').value)||0;
+  const payload = {
+    nome: document.getElementById('campNome').value.trim(),
+    premio: document.getElementById('campPremio').value.trim(),
+    tipo, meta_valor: tipo==='ranking' ? null : meta,
+    data_inicio: document.getElementById('campInicio').value,
+    data_fim: document.getElementById('campFim').value,
+    ativa: document.getElementById('campAtiva').value==='true'
+  };
+  if(!payload.nome || !payload.premio){ showToast('Informe nome e prêmio.','error'); return; }
+  if(tipo!=='ranking' && meta<=0){ showToast('Informe a meta.','error'); return; }
+  if(!payload.data_inicio || !payload.data_fim || payload.data_fim<payload.data_inicio){ showToast('Confira as datas.','error'); return; }
+  const {error} = id ? await sb.from('campanhas').update(payload).eq('id',id) : await sb.from('campanhas').insert(payload);
+  if(error){ showToast('Erro: '+error.message,'error'); return; }
+  showToast('Campanha salva!');
+  closeModal('modalCampanha');
+  await carregarTudo(); renderMetas();
+}
+async function excluirCampanha(){
+  const id = document.getElementById('campId').value;
+  if(!id || !confirm('Excluir esta campanha?')) return;
+  const {error} = await sb.from('campanhas').delete().eq('id',id);
+  if(error){ showToast('Erro ao excluir.','error'); return; }
+  showToast('Campanha excluída.');
+  closeModal('modalCampanha');
+  await carregarTudo(); renderMetas();
+}
+
+/* ===== LEADS (funil semanal) ===== */
+const LEAD_ETAPAS = [['Leads gerados','leads_gerados'],['Qualificados','qualificados'],['Agendados','agendados'],['Propostas','propostas'],['Fechamentos','fechamentos']];
+function segundaDe(dataStr){
+  const d = new Date(dataStr+'T00:00:00');
+  const dow = (d.getDay()+6)%7;
+  return addDias(dataStr, -dow);
+}
+function fmtSemana(s){ const fim = addDias(s,6); const f=x=>x.split('-').reverse().slice(0,2).join('/'); return `${f(s)} a ${f(fim)}`; }
+function pctTxt(a,b){ return b>0 ? (a/b*100).toFixed(0)+'%' : '—'; }
+function semanasDoPeriodo(){
+  const n = parseInt(document.getElementById('leadsPeriodo').value)||0;
+  if(!n) return todoFunilSemanal;
+  const corte = addDias(segundaDe(hojeStr()), -7*(n-1));
+  return todoFunilSemanal.filter(s=>s.semana_inicio>=corte);
+}
+function renderLeads(){
+  if(currentProfile?.role!=='gestor') return;
+  if(!document.getElementById('lfSemana').value) document.getElementById('lfSemana').value = hojeStr();
+  const sem = semanasDoPeriodo();
+  const soma = k => sem.reduce((s,x)=>s+(+x[k]||0),0);
+  const tot = Object.fromEntries(LEAD_ETAPAS.map(([,k])=>[k,soma(k)]));
+  const nSem = sem.length;
+  const leadsSem = sem.map(s=>+s.leads_gerados||0);
+
+  document.getElementById('leadsCards').innerHTML = `
+    <div class="card stat-card"><div class="label">Leads por semana (média)</div><div class="value">${nSem?(tot.leads_gerados/nSem).toFixed(0):'—'}</div><div class="delta" style="color:var(--text-2)">${nSem?`variando de ${Math.min(...leadsSem)} a ${Math.max(...leadsSem)}`:'sem semanas lançadas'}</div></div>
+    <div class="card stat-card"><div class="label">Lead → venda</div><div class="value">${pctTxt(tot.fechamentos,tot.leads_gerados)}</div><div class="delta" style="color:var(--text-2)">${tot.fechamentos} fechamento${tot.fechamentos===1?'':'s'} em ${tot.leads_gerados} leads</div></div>
+    <div class="card stat-card"><div class="label">Qualificação</div><div class="value">${pctTxt(tot.qualificados,tot.leads_gerados)}</div><div class="delta" style="color:var(--text-2)">dos leads são qualificados</div></div>
+    <div class="card stat-card"><div class="label">Semanas lançadas</div><div class="value">${nSem}</div></div>`;
+
+  // funil
+  if(!nSem || !tot.leads_gerados){
+    document.getElementById('leadsFunil').innerHTML = '<div class="empty">Lance os números da primeira semana para ver o funil.</div>';
+  } else {
+    let pior = null;
+    const partes = LEAD_ETAPAS.map(([nome,k],i)=>{
+      const v = tot[k]; const pct = v/tot.leads_gerados*100;
+      let conv = '';
+      if(i>0){
+        const ant = tot[LEAD_ETAPAS[i-1][1]];
+        const taxa = ant>0 ? v/ant : null;
+        if(taxa!==null && (pior===null || taxa<pior.taxa)) pior = {taxa, de:LEAD_ETAPAS[i-1][0], para:nome};
+        conv = `<div class="funnel-conv">↓ ${pctTxt(v,ant)} passam de ${LEAD_ETAPAS[i-1][0].toLowerCase()} para ${nome.toLowerCase()}</div>`;
+      }
+      const cores = ['#2A3568','#3B4A8C','#4A5899','#2DB863','#1A6B3A'];
+      return conv + `<div class="funnel-step"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="font-weight:500">${nome}</span><span style="color:var(--text-2)">${v}</span></div>
+        <div style="height:24px;background:var(--bg);border-radius:6px;overflow:hidden"><div style="height:100%;width:${Math.max(pct,v>0?3:0)}%;background:${cores[i]};border-radius:6px"></div></div></div>`;
+    }).join('');
+    document.getElementById('leadsFunil').innerHTML = partes + (pior?`<div class="hint" style="margin-top:12px;color:#8A5A0B"><strong>Maior vazamento:</strong> ${pior.de} → ${pior.para} (${(pior.taxa*100).toFixed(0)}%). É onde mais se perde.</div>`:'');
+  }
+
+  // tabela
+  const tbody = document.querySelector('#tabelaLeads tbody');
+  tbody.innerHTML = todoFunilSemanal.length ? todoFunilSemanal.map(s=>`<tr style="cursor:pointer" onclick='carregarSemanaNoForm(${JSON.stringify(s).replace(/'/g,"&apos;")})'>
+    <td>${fmtSemana(s.semana_inicio)}</td><td>${s.leads_gerados}</td><td>${s.qualificados}</td><td>${s.agendados}</td><td>${s.propostas}</td><td>${s.fechamentos}</td>
+    <td>${pctTxt(s.fechamentos,s.leads_gerados)}</td>
+    <td><button class="btn btn-danger" style="padding:4px 9px;font-size:11.5px" onclick="event.stopPropagation();excluirSemanaLeads('${s.id}')">Excluir</button></td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">Nenhuma semana lançada ainda.</td></tr>';
+}
+function setFormSemana(s){
+  document.getElementById('lfLeads').value = s?.leads_gerados ?? '';
+  document.getElementById('lfQual').value = s?.qualificados ?? '';
+  document.getElementById('lfAgend').value = s?.agendados ?? '';
+  document.getElementById('lfProp').value = s?.propostas ?? '';
+  document.getElementById('lfFech').value = s?.fechamentos ?? '';
+}
+function carregarSemanaNoForm(s){
+  document.getElementById('lfSemana').value = s.semana_inicio;
+  setFormSemana(s);
+  document.getElementById('lfSemana').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function aoMudarSemanaLeads(){
+  const ini = segundaDe(document.getElementById('lfSemana').value || hojeStr());
+  setFormSemana(todoFunilSemanal.find(x=>x.semana_inicio===ini));
+}
+function preencherPropostasFechamentos(){
+  const ini = segundaDe(document.getElementById('lfSemana').value || hojeStr());
+  const fim = addDias(ini,6);
+  document.getElementById('lfProp').value = todasPropostas.filter(p=>p.data>=ini && p.data<=fim).length;
+  document.getElementById('lfFech').value = todasVendas.filter(v=>v.data>=ini && v.data<=fim).length;
+  showToast('Preenchido com o que está no sistema nessa semana. Ajuste se precisar.');
+}
+async function salvarFunilSemana(){
+  const dia = document.getElementById('lfSemana').value;
+  if(!dia){ showToast('Escolha a semana.','error'); return; }
+  const v = id => parseInt(document.getElementById(id).value)||0;
+  const row = { semana_inicio: segundaDe(dia), leads_gerados:v('lfLeads'), qualificados:v('lfQual'), agendados:v('lfAgend'), propostas:v('lfProp'), fechamentos:v('lfFech') };
+  const seq = [row.leads_gerados,row.qualificados,row.agendados,row.propostas,row.fechamentos];
+  for(let i=1;i<seq.length;i++){
+    if(seq[i]>seq[i-1]){ showToast(`${LEAD_ETAPAS[i][0]} não pode ser maior que ${LEAD_ETAPAS[i-1][0].toLowerCase()}. Confira os números.`,'error'); return; }
+  }
+  const {error} = await sb.from('funil_semanal').upsert(row, {onConflict:'semana_inicio'});
+  if(error){ showToast('Erro: '+error.message,'error'); return; }
+  showToast('Semana salva!');
+  await carregarTudo(); renderLeads();
+}
+async function excluirSemanaLeads(id){
+  if(!confirm('Excluir esta semana?')) return;
+  const {error} = await sb.from('funil_semanal').delete().eq('id',id);
+  if(error){ showToast('Erro ao excluir.','error'); return; }
+  await carregarTudo(); renderLeads();
 }
 
 /* ===== ANALISES ===== */
@@ -859,6 +1189,11 @@ function renderVendasTable(){
 }
 
 /* ===== PRODUÇÃO (expectativa de comissão do vendedor) ===== */
+function recebidoDaVenda(vendaId){
+  const parcelas = todosRecebimentos.filter(r=>r.venda_id===vendaId);
+  const rec = parcelas.filter(r=>r.data_recebido);
+  return { valor: rec.reduce((s,r)=>s+(+r.valor||0),0), nRec: rec.length, nTotal: parcelas.length };
+}
 function calcProducaoPorVendedor(vendas, nomeVendedor){
   const doVendedor = vendas.filter(v=>v.vendedor===nomeVendedor);
   const g200 = doVendedor.filter(v=>v.categoria==='200');
@@ -867,14 +1202,25 @@ function calcProducaoPorVendedor(vendas, nomeVendedor){
   const liq300 = g300.reduce((s,v)=>s+(+v.comissao_liquida||0),0);
   const prod200 = liq200 * PRODUCAO_PCT['200'];
   const prod300 = liq300 * PRODUCAO_PCT['300'];
-  return { liq200, liq300, prod200, prod300, total: prod200+prod300, qtd200:g200.length, qtd300:g300.length, vendas: doVendedor };
+  const total = prod200+prod300;
+  // pagamento é sobre o que a operadora já pagou (líquido de imposto)
+  const recebido = doVendedor.reduce((s,v)=>s+recebidoDaVenda(v.id).valor*PRODUCAO_PCT[v.categoria],0);
+  return { liq200, liq300, prod200, prod300, total, recebido, aguardando: Math.max(0,total-recebido), qtd200:g200.length, qtd300:g300.length, vendas: doVendedor };
 }
-function producaoColunasHTML(dados){
+function producaoColunasHTML(dados, nomeVendedor){
+  const abertas = todasPropostas.filter(p=>p.status==='aberta' && p.vendedor===nomeVendedor);
+  const seFechar = abertas.reduce((s,p)=>s+valoresProposta(p).vendedorGanha,0);
+  const pondera = abertas.reduce((s,p)=>s+valoresProposta(p).vendedorGanha*taxaConversao(p.vendedor).taxa,0);
   return `
+    <div class="grid-cards" style="margin-bottom:12px">
+      <div class="card stat-card" style="border-color:#BFE6CE"><div class="label">Já recebido da operadora</div><div class="value" style="color:var(--green-dark)">${fmtMoeda(dados.recebido)}</div><div class="delta" style="color:var(--text-2)">comissão a pagar (líquida de imposto)</div></div>
+      <div class="card stat-card"><div class="label">Aguardando a operadora</div><div class="value">${fmtMoeda(dados.aguardando)}</div><div class="delta" style="color:var(--text-2)">vendido, ainda não recebido</div></div>
+      <div class="card stat-card"><div class="label">Total produzido no mês</div><div class="value">${fmtMoeda(dados.total)}</div><div class="delta" style="color:var(--text-2)">recebido + aguardando</div></div>
+    </div>
     <div class="grid-cards" style="margin-bottom:16px">
-      <div class="card stat-card"><div class="label">Expectativa total de comissão</div><div class="value">${fmtMoeda(dados.total)}</div></div>
       <div class="card stat-card"><div class="label">DoctorClin / MedSênior · 20%</div><div class="value">${fmtMoeda(dados.prod200)}</div><div class="delta">${dados.qtd200} venda(s) · com. líq. empresa ${fmtMoeda(dados.liq200)}</div></div>
       <div class="card stat-card"><div class="label">Amil / Bradesco / SulAmérica · 25%</div><div class="value">${fmtMoeda(dados.prod300)}</div><div class="delta">${dados.qtd300} venda(s) · com. líq. empresa ${fmtMoeda(dados.liq300)}</div></div>
+      <div class="card stat-card" style="border-color:#F2D9A3;background:#FFFBF1"><div class="label">Se fechar as propostas em aberto</div><div class="value" style="color:#B8741A">+${fmtMoeda(seFechar)}</div><div class="delta" style="color:var(--text-2)">${abertas.length} em aberto · pela sua conversão ≈ ${fmtMoeda(pondera)}</div></div>
     </div>`;
 }
 function renderProducao(){
@@ -884,17 +1230,17 @@ function renderProducao(){
   const alvoSelecionado = isGestor ? document.getElementById('producaoVendedorSel').value : currentProfile?.vendedor;
 
   if(isGestor && !alvoSelecionado){
-    // Visão geral: tabela com todos os vendedores
-    const linhas = vendedoresConhecidos.map(nome=>{
-      const d = calcProducaoPorVendedor(vendas, nome);
-      return {nome, ...d};
-    }).sort((a,b)=>b.total-a.total);
+    const linhas = vendedoresConhecidos.map(nome=>({nome, ...calcProducaoPorVendedor(vendas, nome)})).sort((a,b)=>b.total-a.total);
     const totalGeral = linhas.reduce((s,l)=>s+l.total,0);
+    const totalPagar = linhas.reduce((s,l)=>s+l.recebido,0);
     document.getElementById('producaoConteudo').innerHTML = `
-      <div class="card stat-card" style="max-width:280px;margin-bottom:16px"><div class="label">Total esperado (todo o time)</div><div class="value">${fmtMoeda(totalGeral)}</div></div>
+      <div class="grid-cards" style="margin-bottom:16px">
+        <div class="card stat-card" style="border-color:#BFE6CE"><div class="label">A pagar ao time (já recebido)</div><div class="value" style="color:var(--green-dark)">${fmtMoeda(totalPagar)}</div></div>
+        <div class="card stat-card"><div class="label">Total produzido pelo time</div><div class="value">${fmtMoeda(totalGeral)}</div></div>
+      </div>
       <div class="card" style="padding:0;overflow-x:auto">
-        <table><thead><tr><th>Vendedor</th><th>DoctorClin/MedSênior (20%)</th><th>Amil/Bradesco/SulAmérica (25%)</th><th>Total esperado</th></tr></thead>
-        <tbody>${linhas.map(l=>`<tr><td>${l.nome}</td><td>${fmtMoeda(l.prod200)}</td><td>${fmtMoeda(l.prod300)}</td><td><strong>${fmtMoeda(l.total)}</strong></td></tr>`).join('')}</tbody></table>
+        <table><thead><tr><th>Vendedor</th><th>DoctorClin/MedSênior (20%)</th><th>Amil/Bradesco/SulAmérica (25%)</th><th>Total produzido</th><th>Já recebido (a pagar)</th><th>Aguardando</th></tr></thead>
+        <tbody>${linhas.map(l=>`<tr><td>${escHtml(l.nome)}</td><td>${fmtMoeda(l.prod200)}</td><td>${fmtMoeda(l.prod300)}</td><td><strong>${fmtMoeda(l.total)}</strong></td><td style="color:var(--green-dark);font-weight:600">${fmtMoeda(l.recebido)}</td><td>${fmtMoeda(l.aguardando)}</td></tr>`).join('')}</tbody></table>
       </div>`;
     return;
   }
@@ -903,22 +1249,27 @@ function renderProducao(){
   const dados = calcProducaoPorVendedor(vendas, alvoSelecionado);
   const listaHtml = dados.vendas.length ? `
     <div class="card" style="padding:0;overflow-x:auto">
-      <table><thead><tr><th>Data</th><th>Cliente</th><th>Operadora</th><th>Categoria</th><th>Com. líquida (empresa)</th><th>Sua produção</th></tr></thead>
-      <tbody>${dados.vendas.map(v=>`<tr>
+      <table><thead><tr><th>Data</th><th>Cliente</th><th>Operadora</th><th>Categoria</th><th>Sua produção</th><th>Parcelas recebidas</th><th>Já recebido (a pagar)</th></tr></thead>
+      <tbody>${dados.vendas.map(v=>{
+        const rc = recebidoDaVenda(v.id);
+        const pct = PRODUCAO_PCT[v.categoria];
+        return `<tr>
         <td>${(v.data||'').split('-').reverse().join('/')}</td>
-        <td>${v.cliente||''}</td>
+        <td>${escHtml(v.cliente)}</td>
         <td>${OPERADORA_LABEL[v.operadora]||v.operadora||''}</td>
         <td><span class="badge badge-${v.categoria}">${v.categoria}%</span></td>
-        <td>${fmtMoeda(v.comissao_liquida)}</td>
-        <td><strong>${fmtMoeda((+v.comissao_liquida||0)*PRODUCAO_PCT[v.categoria])}</strong></td>
-      </tr>`).join('')}</tbody></table>
+        <td><strong>${fmtMoeda((+v.comissao_liquida||0)*pct)}</strong></td>
+        <td>${rc.nTotal?`${rc.nRec}/${rc.nTotal}`:'—'}</td>
+        <td style="color:var(--green-dark);font-weight:600">${fmtMoeda(rc.valor*pct)}</td>
+      </tr>`;}).join('')}</tbody></table>
     </div>` : '<div class="empty">Nenhuma venda sua neste mês ainda.</div>';
 
-  document.getElementById('producaoConteudo').innerHTML = producaoColunasHTML(dados) + listaHtml;
+  document.getElementById('producaoConteudo').innerHTML = producaoColunasHTML(dados, alvoSelecionado) + listaHtml;
 }
 
 /* ===== METAS ===== */
 function renderMetas(){
+  renderCampanhasAdmin();
   const mes = document.getElementById('metaMes').value || mesAtualStr();
   const metasDoMes={};
   todasMetas.filter(m=>m.mes===mes).forEach(m=>metasDoMes[m.vendedor]=m);
@@ -951,13 +1302,31 @@ function openPropostaModal(p){
   document.getElementById('pVendedor').value = p?.vendedor || currentProfile?.vendedor || vendedoresConhecidos[0] || '';
   document.getElementById('pOperadora').value = p?.operadora || 'DoctorClin';
   document.getElementById('pParcela').value = p?.parcela || '';
-  document.getElementById('pProbabilidade').value = p?.probabilidade ?? 50;
   document.getElementById('pPrevisao').value = p?.previsao_fechamento || '';
   document.getElementById('pStatus').value = p?.status || 'aberta';
+  document.getElementById('pEtapa').value = p?.etapa || 'nova';
+  document.getElementById('pFollowup').value = p?.proximo_followup || '';
+  atualizarCamposEtapa();
+  atualizarPreviewProposta();
   document.getElementById('pOrigem').value = p?.origem || 'Lead Marketing';
   document.getElementById('pObs').value = p?.observacoes || '';
   document.getElementById('pDeleteBtn').style.display = p ? 'inline-block' : 'none';
   document.getElementById('modalProposta').classList.add('visible');
+}
+function atualizarCamposEtapa(){
+  document.getElementById('pEtapaWrap').style.display = document.getElementById('pStatus').value==='aberta' ? 'block' : 'none';
+}
+function aoMudarEtapa(){
+  const etapa = document.getElementById('pEtapa').value;
+  const f = document.getElementById('pFollowup');
+  if(etapa!=='nova' && !f.value) f.value = addDias(hojeStr(), 2);
+}
+function atualizarPreviewProposta(){
+  const parcela = parseFloat(document.getElementById('pParcela').value)||0;
+  const op = document.getElementById('pOperadora').value;
+  const {liquida,categoria} = calcComissao(parcela,op);
+  document.getElementById('pPreview').innerHTML = parcela>0
+    ? `Comissão da empresa: <strong>${fmtMoeda(liquida)}</strong> · Vendedor ganha (${(PRODUCAO_PCT[categoria]*100).toFixed(0)}%): <strong>${fmtMoeda(liquida*PRODUCAO_PCT[categoria])}</strong>` : '';
 }
 async function salvarProposta(){
   const id = document.getElementById('propostaId').value;
@@ -969,13 +1338,17 @@ async function salvarProposta(){
   let data_encerramento = propostaAnterior?.data_encerramento || null;
   if(status!=='aberta' && !data_encerramento){ data_encerramento = new Date().toISOString().slice(0,10); }
   if(status==='aberta'){ data_encerramento = null; }
+  const etapa = document.getElementById('pEtapa').value;
+  let data_apresentacao = propostaAnterior?.data_apresentacao || null;
+  if(status==='aberta' && etapa!=='nova' && !data_apresentacao) data_apresentacao = hojeStr();
   const payload = {
     cliente, data:document.getElementById('pData').value,
     vendedor:document.getElementById('pVendedor').value,
     operadora, categoria: CATEGORIA_MAP[operadora]||'200',
     parcela: parseFloat(document.getElementById('pParcela').value)||0,
-    probabilidade: parseInt(document.getElementById('pProbabilidade').value)||0,
-    previsao_fechamento: document.getElementById('pPrevisao').value || null,
+    previsao_fechamento: status==='aberta' ? (document.getElementById('pPrevisao').value || null) : null,
+    etapa, data_apresentacao,
+    proximo_followup: status==='aberta' ? (document.getElementById('pFollowup').value || null) : null,
     status, data_encerramento,
     origem: document.getElementById('pOrigem').value.trim() || null,
     observacoes: document.getElementById('pObs').value.trim() || null
@@ -1059,37 +1432,96 @@ function renderFunil(){
     <td>${l.fe>0 ? fmtMoeda(l.ticketMedio) : '—'}</td>
   </tr>`).join('') : '<tr><td colspan="6" class="empty">Nenhuma proposta neste período.</td></tr>';
 }
+/* --- Conversão e valor das propostas --- */
+function taxaConversao(vendedor){
+  const enc = todasPropostas.filter(p=>p.status!=='aberta');
+  const doV = enc.filter(p=>p.vendedor===vendedor);
+  if(doV.length>=MIN_ENCERRADAS) return { taxa: doV.filter(p=>p.status==='fechada').length/doV.length, fonte:'vendedor' };
+  if(enc.length>=MIN_ENCERRADAS) return { taxa: enc.filter(p=>p.status==='fechada').length/enc.length, fonte:'time' };
+  return { taxa: CONV_PADRAO, fonte:'padrao' };
+}
+function valoresProposta(p){
+  const {liquida,categoria} = calcComissao(p.parcela, p.operadora);
+  return { liquida, categoria, vendedorGanha: liquida*PRODUCAO_PCT[categoria] };
+}
+function followupInfo(p){
+  if(!p.proximo_followup) return { txt:'Sem follow-up marcado', cls:'fu-none', atrasado:false };
+  const d = diffDias(p.proximo_followup, hojeStr());
+  if(d<0) return { txt:`Follow-up atrasado há ${-d} dia${-d>1?'s':''}`, cls:'fu-late', atrasado:true };
+  if(d===0) return { txt:'Follow-up hoje', cls:'fu-today', atrasado:false };
+  return { txt:`Follow-up em ${d} dia${d>1?'s':''}`, cls:'fu-ok', atrasado:false };
+}
+function propostasAbertasEscopo(){
+  const isGestor = currentProfile?.role==='gestor';
+  const sel = isGestor ? document.getElementById('prioVendedor').value : currentProfile?.vendedor;
+  return todasPropostas.filter(p=>p.status==='aberta' && (!sel || p.vendedor===sel));
+}
 function renderPropostas(){
+  const isGestor = currentProfile?.role==='gestor';
+  const row = document.getElementById('prioVendedorRow');
+  row.style.display = isGestor ? 'flex' : 'none';
+  if(isGestor){
+    const sel = document.getElementById('prioVendedor');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todo o time</option>' + vendedoresConhecidos.map(v=>`<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+    sel.value = vendedoresConhecidos.includes(cur) ? cur : '';
+  }
+
   renderFunil();
-  const statusFiltro = document.getElementById('filtroPropostaStatus').value;
-  const lista = statusFiltro ? todasPropostas.filter(p=>p.status===statusFiltro) : todasPropostas;
 
-  const abertas = todasPropostas.filter(p=>p.status==='aberta');
-  const previsaoPonderada = abertas.reduce((s,p)=>{
-    const {liquida} = calcComissao(p.parcela, p.operadora);
-    return s + liquida*((p.probabilidade||0)/100);
-  },0);
-  const fechadas = todasPropostas.filter(p=>p.status==='fechada').length;
-  const total = todasPropostas.length;
-  const taxaConversao = total ? ((fechadas/total)*100).toFixed(1) : '0.0';
-
+  // ---- cards do topo (escopo: o vendedor logado, ou o time/vendedor escolhido pelo gestor)
+  const abertas = propostasAbertasEscopo();
+  const emJogo = abertas.reduce((s,p)=>s+valoresProposta(p).liquida,0);
+  const potencialVend = abertas.reduce((s,p)=>s+valoresProposta(p).vendedorGanha,0);
+  const potencialEmpresa = abertas.reduce((s,p)=>s+valoresProposta(p).liquida*taxaConversao(p.vendedor).taxa,0);
+  const atrasados = abertas.filter(p=>followupInfo(p).atrasado).length;
   document.getElementById('propostaCards').innerHTML = `
-    <div class="card stat-card"><div class="label">Abertas</div><div class="value">${abertas.length}</div></div>
-    <div class="card stat-card"><div class="label">Previsão ponderada (líquida)</div><div class="value">${fmtMoeda(previsaoPonderada)}</div></div>
-    <div class="card stat-card"><div class="label">Taxa de conversão</div><div class="value">${taxaConversao}%</div></div>
+    <div class="card stat-card"><div class="label">Propostas em aberto</div><div class="value">${abertas.length}</div>${atrasados?`<div class="delta down">${atrasados} com follow-up atrasado</div>`:'<div class="delta up">Follow-ups em dia</div>'}</div>
+    <div class="card stat-card"><div class="label">Comissão em jogo</div><div class="value">${fmtMoeda(emJogo)}</div><div class="delta" style="color:var(--text-2)">se todas fechassem</div></div>
+    <div class="card stat-card"><div class="label">${isGestor?'Vendedores ganhariam':'Você ganharia'}</div><div class="value">${fmtMoeda(potencialVend)}</div><div class="delta" style="color:var(--text-2)">se todas fechassem</div></div>
+    <div class="card stat-card"><div class="label">Caixa esperado (pela conversão)</div><div class="value">${fmtMoeda(potencialEmpresa)}</div><div class="delta" style="color:var(--text-2)">comissão da empresa</div></div>
   `;
 
+  // ---- lista priorizada
+  const ordenadas = [...abertas].sort((a,b)=>{
+    const sa = valoresProposta(a).liquida*(PESO_ETAPA[a.etapa]||0.4);
+    const sb_ = valoresProposta(b).liquida*(PESO_ETAPA[b.etapa]||0.4);
+    return sb_-sa;
+  });
+  document.getElementById('propostasPrioridade').innerHTML = ordenadas.length ? ordenadas.map((p,i)=>{
+    const v = valoresProposta(p);
+    const fu = followupInfo(p);
+    const dias = p.data_apresentacao ? diffDias(hojeStr(), p.data_apresentacao) : null;
+    return `<div class="prop-card ${i<3?'quente':''}" onclick='openPropostaModal(${JSON.stringify(p).replace(/'/g,"&apos;")})'>
+      <div class="pc-main">
+        <div class="pc-top">${i<3?'<span class="pc-fire">🔥</span>':''}<span class="pc-name">${escHtml(p.cliente)}</span>
+          <span class="badge badge-etapa-${p.etapa||'nova'}">${ETAPAS[p.etapa]||'Nova'}</span>
+          <span class="badge badge-${v.categoria}">${v.categoria==='300'?'300%':'200%'}</span></div>
+        <div class="pc-sub">${isGestor?escHtml(p.vendedor)+' · ':''}${OPERADORA_LABEL[p.operadora]||p.operadora||''} · mensalidade ${fmtMoeda(p.parcela)}${dias!==null?` · apresentada há ${dias} dia${dias===1?'':'s'}`:''}</div>
+        <div class="pc-fu ${fu.cls}">${fu.txt}</div>
+      </div>
+      <div class="pc-money">
+        <div class="pc-money-label">${isGestor?'Vendedor ganha':'Você ganha'}</div>
+        <div class="pc-money-val">${fmtMoeda(v.vendedorGanha)}</div>
+        <div class="pc-money-sub">comissão da empresa ${fmtMoeda(v.liquida)}</div>
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty">Nenhuma proposta em aberto. Hora de prospectar. 💪</div>';
+
+  // ---- histórico completo
+  const statusFiltro = document.getElementById('filtroPropostaStatus').value;
+  const lista = statusFiltro ? todasPropostas.filter(p=>p.status===statusFiltro) : todasPropostas;
   const tbody = document.querySelector('#tabelaPropostas tbody');
   if(!lista.length){ tbody.innerHTML = '<tr><td colspan="9" class="empty">Nenhuma proposta encontrada.</td></tr>'; return; }
   tbody.innerHTML = lista.map(p=>`
     <tr style="cursor:pointer" onclick='openPropostaModal(${JSON.stringify(p).replace(/'/g,"&apos;")})'>
       <td>${(p.data||'').split('-').reverse().join('/')}</td>
-      <td>${p.cliente||''}</td>
-      <td>${p.vendedor||''}</td>
+      <td>${escHtml(p.cliente)}</td>
+      <td>${escHtml(p.vendedor)}</td>
       <td>${OPERADORA_LABEL[p.operadora]||p.operadora||''}</td>
       <td>${fmtMoeda(p.parcela)}</td>
-      <td>${p.probabilidade||0}%</td>
-      <td>${p.previsao_fechamento ? p.previsao_fechamento.split('-').reverse().join('/') : '—'}</td>
+      <td>${p.status==='aberta'?(ETAPAS[p.etapa]||'Nova'):'—'}</td>
+      <td>${p.status==='aberta' && p.proximo_followup ? p.proximo_followup.split('-').reverse().join('/') : '—'}</td>
       <td><span class="badge badge-${p.status}">${p.status}</span></td>
       <td>✏️</td>
     </tr>`).join('');
@@ -1124,14 +1556,13 @@ function ultimosMeses(n){
   return arr;
 }
 function overlayBarChartSVG(data){
-  const W=720,H=270,padL=68,padR=20,padT=26,padB=42;
+  const W=760,H=290,padL=68,padR=16,padT=28,padB=42;
   const innerW=W-padL-padR, innerH=H-padT-padB;
-  const max=Math.max(...data.map(d=>d.recebido+d.previsto+d.atrasado),1);
+  const tot = d => d.recebido+d.previsto+d.atrasado+d.potencial;
+  const max=Math.max(...data.map(tot),1);
   const n=data.length||1;
   const slot=innerW/n;
-  const barW=Math.min(48, slot*0.5);
-  const y = v => padT+innerH-(v/max)*innerH;
-
+  const barW=Math.min(48, slot*0.55);
   const gridLines=[0,0.25,0.5,0.75,1].map(f=>{
     const yy=padT+innerH-f*innerH;
     return `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="#DDE0EC" stroke-width="1"/>
@@ -1142,48 +1573,76 @@ function overlayBarChartSVG(data){
   const bars = data.map((d,i)=>{
     const cx = padL + slot*i + slot/2;
     const x0 = cx - barW/2;
-    const total = d.recebido + d.previsto + d.atrasado;
-    // empilhado de baixo pra cima: recebido -> atrasado -> previsto
     const yBase = padT+innerH;
-    const hReceb = (d.recebido/max)*innerH;
-    const hAtraso = (d.atrasado/max)*innerH;
-    const hPrev = (d.previsto/max)*innerH;
-    const yRecebTop = yBase - hReceb;
-    const yAtrasoTop = yRecebTop - hAtraso;
-    const yPrevTop = yAtrasoTop - hPrev;
+    const hh = v => (v/max)*innerH;
+    // empilhado de baixo pra cima: recebido -> atrasado -> previsto -> potencial
+    let y = yBase;
+    const seg = (valor, fill, extra='')=>{
+      const h = hh(valor); if(h<=0) return '';
+      y -= h;
+      return `<rect x="${x0}" y="${y}" width="${barW}" height="${h}" rx="3" fill="${fill}" ${extra}/>`;
+    };
+    const parts = seg(d.recebido,'#2DB863') + seg(d.atrasado,'#C0392B') + seg(d.previsto,'#4A5899') + seg(d.potencial,'url(#hatchGold)','stroke="#E8A020" stroke-width="1.2"');
+    const total = tot(d);
     const isMesAtual = d.ym === hojeYM;
-    return `
-      ${hReceb>0?`<rect x="${x0}" y="${yRecebTop}" width="${barW}" height="${hReceb}" rx="3" fill="#2DB863"/>`:''}
-      ${hAtraso>0?`<rect x="${x0}" y="${yAtrasoTop}" width="${barW}" height="${hAtraso}" rx="3" fill="#C0392B"/>`:''}
-      ${hPrev>0?`<rect x="${x0}" y="${yPrevTop}" width="${barW}" height="${hPrev}" rx="3" fill="#4A5899"/>`:''}
-      ${total>0?`<text x="${cx}" y="${yPrevTop-8}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#5C5850" font-family="DM Sans, sans-serif">${fmtMoeda(total)}</text>`:''}
-      <text x="${cx}" y="${H-12}" text-anchor="middle" font-size="11.5" font-weight="${isMesAtual?'700':'400'}" fill="${isMesAtual?'#2A3568':'#5C5850'}" font-family="DM Sans, sans-serif">${d.label}</text>
-    `;
+    return `${parts}
+      ${total>0?`<text x="${cx}" y="${y-8}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#5C5850" font-family="DM Sans, sans-serif">${fmtMoeda(total)}</text>`:''}
+      <text x="${cx}" y="${H-12}" text-anchor="middle" font-size="11.5" font-weight="${isMesAtual?'700':'400'}" fill="${isMesAtual?'#2A3568':'#5C5850'}" font-family="DM Sans, sans-serif">${d.label}</text>`;
   }).join('');
 
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:720px" xmlns="http://www.w3.org/2000/svg">
+  const sw = (bg,label,extra='')=>`<span><span style="display:inline-block;width:10px;height:10px;background:${bg};border-radius:2px;margin-right:5px;vertical-align:middle;${extra}"></span>${label}</span>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:760px" xmlns="http://www.w3.org/2000/svg">
+    <defs><pattern id="hatchGold" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
+      <rect width="7" height="7" fill="#FBEFD2"/><line x1="0" y1="0" x2="0" y2="7" stroke="#E8A020" stroke-width="2.2"/></pattern></defs>
     ${gridLines}${bars}
   </svg>
-  <div style="display:flex;gap:18px;margin-top:6px;flex-wrap:wrap;font-size:12px;color:var(--text-2)">
-    <span><span style="display:inline-block;width:10px;height:10px;background:#2DB863;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Recebido</span>
-    <span><span style="display:inline-block;width:10px;height:10px;background:#4A5899;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Previsto (a receber)</span>
-    <span><span style="display:inline-block;width:10px;height:10px;background:#C0392B;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Atrasado (passou do prazo)</span>
+  <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap;font-size:12px;color:var(--text-2)">
+    ${sw('#2DB863','Recebido')}${sw('#4A5899','Previsto (já fechado)')}${sw('#C0392B','Atrasado')}
+    ${sw('repeating-linear-gradient(45deg,#FBEFD2,#FBEFD2 2px,#E8A020 2px,#E8A020 4px)','Potencial (propostas em aberto × conversão)','border:1px solid #E8A020')}
   </div>`;
+}
+function dataEstimadaParcela(r){
+  if(r.data_prevista) return r.data_prevista;
+  const base = r.venda?.data; if(!base) return null;
+  return addDias(base, 38 + 30*((r.numero_parcela||1)-1)); // 1ª: ~30-45d (ponto médio); demais: +30d cada
+}
+function potencialPropostas(){
+  const hoje = hojeStr(); const out = [];
+  todasPropostas.filter(p=>p.status==='aberta').forEach(p=>{
+    const {liquida} = calcComissao(p.parcela, p.operadora);
+    if(!(liquida>0)) return;
+    const conv = taxaConversao(p.vendedor).taxa;
+    const fech = (p.previsao_fechamento && p.previsao_fechamento>=hoje) ? p.previsao_fechamento : addDias(hoje, p.previsao_fechamento?7:15);
+    for(let n=1;n<=3;n++) out.push({ data: addDias(fech, 38+30*(n-1)), valor: (liquida/3)*conv });
+  });
+  return out;
 }
 function dadosFluxoCaixa(){
   const meses = [];
   const hoje = new Date();
-  for(let i=-3;i<=3;i++){ const d=new Date(hoje.getFullYear(),hoje.getMonth()+i,1); meses.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
-  const hojeStr = hoje.toISOString().slice(0,10);
+  for(let i=-2;i<=4;i++){ const d=new Date(hoje.getFullYear(),hoje.getMonth()+i,1); meses.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+  const hj = hojeStr();
+  const pot = potencialPropostas();
   return meses.map(m=>{
     const recebido = todosRecebimentos
       .filter(r=>r.data_recebido && (r.data_recebido||'').slice(0,7)===m)
       .reduce((s,r)=>s+(+r.valor||0),0);
-    const pendentesDoMes = todosRecebimentos.filter(r=>!r.data_recebido && r.data_prevista && (r.data_prevista||'').slice(0,7)===m);
-    const atrasado = pendentesDoMes.filter(r=>r.data_prevista < hojeStr).reduce((s,r)=>s+(+r.valor||0),0);
-    const previsto = pendentesDoMes.filter(r=>r.data_prevista >= hojeStr).reduce((s,r)=>s+(+r.valor||0),0);
-    return { ym:m, label: mesLabel(m), recebido, previsto, atrasado };
+    const pend = todosRecebimentos.filter(r=>{ if(r.data_recebido) return false; const d=dataEstimadaParcela(r); return d && d.slice(0,7)===m; });
+    const atrasado = pend.filter(r=>dataEstimadaParcela(r) < hj).reduce((s,r)=>s+(+r.valor||0),0);
+    const previsto = pend.filter(r=>dataEstimadaParcela(r) >= hj).reduce((s,r)=>s+(+r.valor||0),0);
+    const potencial = pot.filter(x=>x.data.slice(0,7)===m).reduce((s,x)=>s+x.valor,0);
+    return { ym:m, label: mesLabel(m), recebido, previsto, atrasado, potencial };
   });
+}
+function conversaoUsadaHTML(){
+  const fonteTxt = { vendedor:'histórico do vendedor', time:'média do time', padrao:`padrão de ${(CONV_PADRAO*100).toFixed(0)}% (ainda sem histórico)` };
+  const abertasPorV = {};
+  todasPropostas.filter(p=>p.status==='aberta').forEach(p=>{ abertasPorV[p.vendedor]=(abertasPorV[p.vendedor]||0)+1; });
+  const linhas = Object.keys(abertasPorV).sort().map(v=>{
+    const t = taxaConversao(v);
+    return `<span style="display:inline-block;margin:0 14px 4px 0"><strong>${escHtml(v)}</strong> ${(t.taxa*100).toFixed(0)}% <span style="color:var(--text-3)">· ${fonteTxt[t.fonte]} · ${abertasPorV[v]} em aberto</span></span>`;
+  }).join('');
+  return linhas ? `<div class="hint" style="line-height:1.7"><strong style="color:var(--text-2)">Conversão aplicada ao potencial:</strong> ${linhas}<br>A taxa real de cada vendedor passa a valer com ${MIN_ENCERRADAS} propostas encerradas (fechadas ou perdidas).</div>` : '';
 }
 function tempoMedioPorOperadoraHTML(){
   const grupos = {};
@@ -1212,9 +1671,11 @@ function renderFinanceiro(){
   const mesAtual = mesAtualStr();
   const recebidoMes = recebidos.filter(r=>(r.data_recebido||'').slice(0,7)===mesAtual).reduce((s,r)=>s+(+r.valor||0),0);
   const totalRecebidoHistorico = recebidos.reduce((s,r)=>s+(+r.valor||0),0);
+  const totalPotencial = potencialPropostas().reduce((s,x)=>s+x.valor,0);
 
   document.getElementById('financeiroCards').innerHTML = `
     <div class="card stat-card"><div class="label">Total pendente a receber</div><div class="value">${fmtMoeda(totalPendente)}</div></div>
+    <div class="card stat-card"><div class="label">Potencial das propostas abertas</div><div class="value" style="color:#B8741A">${fmtMoeda(totalPotencial)}</div><div class="delta" style="color:var(--text-2)">ponderado pela conversão</div></div>
     <div class="card stat-card"><div class="label">Recebido este mês</div><div class="value">${fmtMoeda(recebidoMes)}</div></div>
     <div class="card stat-card"><div class="label">Recebido histórico</div><div class="value">${fmtMoeda(totalRecebidoHistorico)}</div></div>
   `;
@@ -1235,7 +1696,7 @@ function renderFinanceiro(){
   let projecaoHtml = '';
   if(aguardandoConfirmacao>0){
     projecaoHtml += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-      <span style="color:var(--text-2)">Aguardando confirmação da 1ª parcela (previsão 30-45 dias)</span>
+      <span style="color:var(--text-2)">Sem data confirmada ainda (1ª parcela: 30–45 dias após a venda; demais: +30 dias de cada recebimento)</span>
       <strong>${fmtMoeda(aguardandoConfirmacao)}</strong></div>`;
   }
   if(mesesOrdenados.length){
@@ -1245,6 +1706,7 @@ function renderFinanceiro(){
   document.getElementById('financeiroProjecao').innerHTML = projecaoHtml || '<div class="empty">Nenhuma parcela pendente no momento.</div>';
 
   document.getElementById('financeiroBarChart').innerHTML = overlayBarChartSVG(dadosFluxoCaixa());
+  document.getElementById('financeiroConversao').innerHTML = conversaoUsadaHTML();
   document.getElementById('financeiroTempoMedio').innerHTML = tempoMedioPorOperadoraHTML();
 
   // Tabela
