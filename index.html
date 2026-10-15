@@ -79,6 +79,53 @@ main{flex:1;padding:28px 32px;max-width:1400px}
 .progress-fill{height:100%;background:var(--green);border-radius:99px;transition:width .3s}
 .progress-fill.over{background:var(--gold)}
 
+/* ===== PÓDIO ===== */
+.podium-stage{background:linear-gradient(160deg,#2A3568 0%,#1f2854 100%);border-radius:var(--radius);padding:34px 24px 0;margin-bottom:18px;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}
+.podium-stage::before{content:'';position:absolute;top:-120px;left:50%;width:520px;height:520px;transform:translateX(-50%);background:radial-gradient(circle,rgba(232,160,32,.22) 0%,rgba(232,160,32,0) 65%);pointer-events:none}
+.podium-title{position:relative;text-align:center;color:rgba(255,255,255,.55);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;margin-bottom:26px}
+.podium{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:10px;max-width:760px;margin:0 auto}
+.pd-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center}
+.pd-col.p1{flex:1.25}
+.pd-crown{font-size:34px;line-height:1;margin-bottom:4px;animation:pdFloat 3s ease-in-out infinite;filter:drop-shadow(0 4px 10px rgba(232,160,32,.55))}
+.pd-avatar{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:26px;color:#fff;border:3px solid;background:rgba(255,255,255,.08);margin-bottom:10px;flex-shrink:0}
+.p1 .pd-avatar{width:92px;height:92px;font-size:38px;border-color:#E8A020;box-shadow:0 0 0 6px rgba(232,160,32,.18),0 10px 30px rgba(232,160,32,.35);background:rgba(232,160,32,.14)}
+.p2 .pd-avatar{border-color:#C7CBDA}
+.p3 .pd-avatar{border-color:#C98A4B}
+.pd-name{color:#fff;font-weight:600;font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p1 .pd-name{font-size:17px}
+.pd-val{font-family:'DM Serif Display',serif;color:#fff;font-size:19px;margin:2px 0 6px}
+.p1 .pd-val{font-size:28px;color:#F5C25B}
+.pd-gap{font-size:11px;color:rgba(255,255,255,.6);margin-bottom:8px;min-height:15px}
+.pd-meta{width:80%;max-width:150px;margin-bottom:10px}
+.pd-meta .bar{height:5px;background:rgba(255,255,255,.15);border-radius:99px;overflow:hidden}
+.pd-meta .fill{height:100%;background:#2DB863;border-radius:99px}
+.pd-meta .fill.over{background:#E8A020}
+.pd-meta small{display:block;font-size:10.5px;color:rgba(255,255,255,.55);margin-top:3px}
+.pd-step{width:100%;border-radius:10px 10px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:12px;font-family:'DM Serif Display',serif;color:rgba(255,255,255,.92);transform-origin:bottom;animation:pdRise .7s cubic-bezier(.2,.8,.2,1) both}
+.p1 .pd-step{height:170px;font-size:64px;background:linear-gradient(180deg,#F5C25B 0%,#E8A020 55%,#B9801A 100%);box-shadow:0 -8px 32px rgba(232,160,32,.35);animation-delay:.1s}
+.p2 .pd-step{height:116px;font-size:48px;background:linear-gradient(180deg,#DDE0EC 0%,#B8BDCF 55%,#8F96B3 100%);animation-delay:.25s}
+.p3 .pd-step{height:84px;font-size:42px;background:linear-gradient(180deg,#DDA066 0%,#C98A4B 55%,#9C6530 100%);animation-delay:.4s}
+.pd-step span{text-shadow:0 2px 6px rgba(0,0,0,.25)}
+.pd-col.vazio .pd-avatar{border-style:dashed;border-color:rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.3)}
+.pd-col.vazio .pd-name{color:rgba(255,255,255,.4);font-weight:400}
+.pd-col.vazio .pd-step{background:rgba(255,255,255,.07);box-shadow:none}
+.rank-rest{display:flex;align-items:center;gap:14px;padding:12px 18px;margin-bottom:8px}
+.rank-rest .rr-pos{font-family:'DM Serif Display',serif;font-size:18px;width:34px;text-align:center;color:var(--text-3)}
+.rank-rest .rr-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:16px;flex-shrink:0}
+@keyframes pdRise{from{transform:scaleY(0);opacity:0}to{transform:scaleY(1);opacity:1}}
+@keyframes pdFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@media(prefers-reduced-motion:reduce){.pd-step,.pd-crown{animation:none}}
+@media(max-width:600px){
+  .podium-stage{padding:26px 10px 0}
+  .podium{gap:6px}
+  .pd-avatar{width:48px;height:48px;font-size:20px}
+  .p1 .pd-avatar{width:68px;height:68px;font-size:28px}
+  .pd-name{font-size:12px}.p1 .pd-name{font-size:14px}
+  .pd-val{font-size:14px}.p1 .pd-val{font-size:20px}
+  .pd-crown{font-size:26px}
+  .p1 .pd-step{height:130px;font-size:48px}.p2 .pd-step{height:90px;font-size:36px}.p3 .pd-step{height:66px;font-size:32px}
+}
+
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border);font-weight:600}
 td{padding:10px 12px;border-bottom:1px solid var(--border)}
@@ -580,25 +627,68 @@ function renderDashboard(){
   const ranked = Object.entries(porVendedor).sort((a,b)=>b[1]-a[1]);
   const metasDoMes = {};
   todasMetas.filter(m=>m.mes===mes).forEach(m=>metasDoMes[m.vendedor]=+m.meta_comissao||0);
-  const emojis=['🥇','🥈','🥉'];
 
   if(!ranked.length){
     document.getElementById('dashRanking').innerHTML = '<div class="empty">Nenhuma venda registrada neste mês ainda.</div>';
     return;
   }
-  document.getElementById('dashRanking').innerHTML = ranked.map(([nome,val],i)=>{
+  document.getElementById('dashRanking').innerHTML = podiumHTML(ranked, metasDoMes);
+}
+function escHtml(s){ return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+function podiumHTML(ranked, metasDoMes){
+  const comVendas = ranked.filter(([,v])=>v>0);
+  const semVendas = ranked.filter(([,v])=>v<=0);
+  const top = comVendas.slice(0,3);
+  const resto = [...comVendas.slice(3), ...semVendas];
+
+  const metaHTML = (nome,val)=>{
+    const meta = metasDoMes[nome]||0;
+    if(!(meta>0)) return '';
+    const pct = Math.min(100,(val/meta)*100);
+    return `<div class="pd-meta"><div class="bar"><div class="fill ${val>=meta?'over':''}" style="width:${pct}%"></div></div><small>${pct.toFixed(0)}% da meta</small></div>`;
+  };
+  const col = (idx, cls)=>{
+    const item = top[idx];
+    if(!item){
+      return `<div class="pd-col ${cls} vazio"><div class="pd-avatar">?</div><div class="pd-name">Vaga aberta</div><div class="pd-val">&nbsp;</div><div class="pd-gap">&nbsp;</div><div class="pd-step"><span>${idx+1}</span></div></div>`;
+    }
+    const [nome,val] = item;
+    let gap = '';
+    if(idx===0 && top[1]) gap = `+${fmtMoeda(val-top[1][1])} sobre o 2º`;
+    if(idx===1 && top[0]) gap = `${fmtMoeda(top[0][1]-val)} do 1º`;
+    if(idx===2 && top[1]) gap = `${fmtMoeda(top[1][1]-val)} do 2º`;
+    return `<div class="pd-col ${cls}">
+      ${idx===0?'<div class="pd-crown">👑</div>':''}
+      <div class="pd-avatar">${escHtml(nome.charAt(0).toUpperCase())}</div>
+      <div class="pd-name" title="${escHtml(nome)}">${escHtml(nome)}</div>
+      <div class="pd-val">${fmtMoeda(val)}</div>
+      <div class="pd-gap">${gap}</div>
+      ${metaHTML(nome,val)}
+      <div class="pd-step"><span>${idx+1}</span></div>
+    </div>`;
+  };
+
+  const podium = `<div class="podium-stage">
+    <div class="podium-title">Pódio do mês · comissão líquida</div>
+    <div class="podium">${col(1,'p2')}${col(0,'p1')}${col(2,'p3')}</div>
+  </div>`;
+
+  const restoHTML = resto.map(([nome,val],i)=>{
+    const pos = top.length + i + 1;
     const meta = metasDoMes[nome]||0;
     const pct = meta>0 ? Math.min(100,(val/meta)*100) : 0;
-    const over = meta>0 && val>=meta;
-    return `<div class="card rank-card">
-      <div class="rank-pos">${emojis[i]||('#'+(i+1))}</div>
+    return `<div class="card rank-rest">
+      <div class="rr-pos">${comVendas.length>=pos?pos:'—'}</div>
+      <div class="rr-avatar">${escHtml(nome.charAt(0).toUpperCase())}</div>
       <div class="rank-info">
-        <div class="rank-name">${nome}</div>
-        <div class="rank-val">${fmtMoeda(val)}${meta>0?` de meta ${fmtMoeda(meta)} (${pct.toFixed(0)}%)`:''}</div>
-        ${meta>0?`<div class="progress-bar"><div class="progress-fill ${over?'over':''}" style="width:${pct}%"></div></div>`:''}
+        <div class="rank-name">${escHtml(nome)}</div>
+        <div class="rank-val">${val>0?fmtMoeda(val):'Sem vendas no mês'}${meta>0?` · meta ${fmtMoeda(meta)} (${pct.toFixed(0)}%)`:''}</div>
+        ${meta>0?`<div class="progress-bar"><div class="progress-fill ${val>=meta?'over':''}" style="width:${pct}%"></div></div>`:''}
       </div>
     </div>`;
   }).join('');
+
+  return podium + restoHTML;
 }
 
 /* ===== ANALISES ===== */
