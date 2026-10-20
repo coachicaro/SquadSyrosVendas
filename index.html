@@ -246,8 +246,14 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <div id="view-analises" style="display:none">
       <h1 class="page-title">Análises</h1>
       <div class="page-sub">Indicadores do time por período — vendedores, operadoras, meta e comparativos</div>
-      <div class="row">
-        <select id="analisePeriodo" onchange="renderAnalises()"></select>
+      <div class="row" style="flex-wrap:wrap;align-items:center">
+        <select id="analisePeriodo" onchange="aoMudarPeriodoAnalise()"></select>
+        <span id="analiseCustom" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:12.5px;color:var(--text-2)">De</span><input type="date" id="analiseDe" onchange="renderAnalises()" style="width:auto">
+          <span style="font-size:12.5px;color:var(--text-2)">até</span><input type="date" id="analiseAte" onchange="renderAnalises()" style="width:auto">
+          <select id="analiseMesDe" onchange="aplicarMesAnalise('De')"></select>
+          <select id="analiseMesAte" onchange="aplicarMesAnalise('Ate')"></select>
+        </span>
         <select id="analiseBase" onchange="renderAnalises()">
           <option value="venda">Base: data da venda (competência)</option>
           <option value="caixa">Base: data do recebimento (caixa)</option>
@@ -277,7 +283,16 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
         <div id="chartCategoria"></div>
       </div>
       <div class="card">
-        <h3 style="margin-bottom:14px">Evolução — últimos 6 meses</h3>
+        <h3 style="margin-bottom:4px">Evolução</h3>
+        <div class="hint" style="margin:0 0 12px">Monte o gráfico como quiser: quantos meses, agrupamento, o que medir e com o que comparar.</div>
+        <div class="row" style="flex-wrap:wrap;margin-bottom:14px">
+          <select id="evMeses" onchange="renderEvolucaoAnalise()"><option value="3">Últimos 3 meses</option><option value="6" selected>Últimos 6 meses</option><option value="9">Últimos 9 meses</option><option value="12">Últimos 12 meses</option><option value="18">Últimos 18 meses</option><option value="24">Últimos 24 meses</option></select>
+          <select id="evGrupo" onchange="renderEvolucaoAnalise()"><option value="1">Mês a mês</option><option value="2">Agrupar 2 meses</option><option value="3">Agrupar 3 meses (trimestre)</option><option value="4">Agrupar 4 meses</option><option value="5">Agrupar 5 meses</option><option value="6">Agrupar 6 meses</option></select>
+          <select id="evMetrica" onchange="renderEvolucaoAnalise()"><option value="valor" id="evMetricaValor">Comissão líquida</option><option value="qtd">Nº de vendas</option><option value="mensal">Mensalidade total</option><option value="ticket">Ticket médio</option></select>
+          <select id="evComp" onchange="renderEvolucaoAnalise()"><option value="">Sem comparação</option><option value="ano">Comparar com o ano passado</option><option value="ant">Comparar com o período anterior</option></select>
+          <select id="evVend" onchange="renderEvolucaoAnalise()"></select>
+          <select id="evOp" onchange="renderEvolucaoAnalise()"></select>
+        </div>
         <div id="chartEvolucao"></div>
       </div>
     </div>
@@ -614,7 +629,7 @@ const OPERADORA_LABEL = { DoctorClin:'DoctorClin', MedSenior:'MedSênior', Amil:
 
 let currentProfile = null;
 let todasVendas = [], todasMetas = [], todasPropostas = [], todosRecebimentos = [], todasCampanhas = [], todoFunilSemanal = [];
-let vendedoresConhecidos = [];
+let vendedoresConhecidos = [], vendedoresInativos = new Set();
 
 function calcComissao(parcela, operadora){
   const categoria = CATEGORIA_MAP[operadora] || '200';
@@ -691,12 +706,12 @@ async function carregarTudo(){
     sb.from('vendas').select('*').order('data',{ascending:false}),
     sb.from('metas_mensais').select('*'),
     sb.from('propostas').select('*').order('data',{ascending:false}),
-    sb.from('profiles').select('nome,vendedor')
+    sb.from('profiles').select('*')
   ]);
   todasVendas = v||[]; todasMetas = m||[]; todasPropostas = p||[];
-  const setV = new Set();
-  (profs||[]).forEach(p=>{ if(p.vendedor) setV.add(p.vendedor); });
-  todasVendas.forEach(v=>{ if(v.vendedor) setV.add(v.vendedor); });
+  const setV = new Set(); vendedoresInativos = new Set();
+  (profs||[]).forEach(p=>{ if(p.vendedor){ if(p.ativo===false) vendedoresInativos.add(p.vendedor); else setV.add(p.vendedor); } });
+  todasVendas.forEach(v=>{ if(v.vendedor && !vendedoresInativos.has(v.vendedor)) setV.add(v.vendedor); });
   vendedoresConhecidos = [...setV].sort();
   popularSelectsMes();
   popularSelectsVendedor();
@@ -1138,16 +1153,34 @@ function barChart(data, colorFn){
 /* ===== ANÁLISES (gestor) ===== */
 const pad2 = n => String(n).padStart(2,'0');
 const dStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const fmtBR = s => s.split('-').reverse().join('/');
 function popularPeriodoAnalise(){
   const sel = document.getElementById('analisePeriodo');
   if(sel.options.length) return;
-  const hoje = new Date(); let ops = [];
-  for(let i=0;i<6;i++){ const d = new Date(hoje.getFullYear(), hoje.getMonth()-i, 1); const m=`${d.getFullYear()}-${pad2(d.getMonth()+1)}`; ops.push(`<option value="m:${m}">${mesLabel(m)}${i===0?' (mês atual)':''}</option>`); }
-  ops.push('<option value="u3">Últimos 3 meses</option>');
+  const hoje = new Date(); const ops = []; const mopt = [];
+  for(let i=0;i<24;i++){ const d = new Date(hoje.getFullYear(), hoje.getMonth()-i, 1); const m=`${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
+    if(i<12) ops.push(`<option value="m:${m}">${mesLabel(m)}${i===0?' (mês atual)':''}</option>`);
+    mopt.push(`<option value="${m}">${mesLabel(m)}</option>`); }
+  [3,4,5,6,9,12].forEach(n=>ops.push(`<option value="n:${n}">Últimos ${n} meses</option>`));
   ops.push(`<option value="ano">Ano de ${hoje.getFullYear()}</option>`);
+  ops.push(`<option value="anoant">Ano de ${hoje.getFullYear()-1}</option>`);
   ops.push('<option value="tudo">Tudo</option>');
-  sel.innerHTML = ops.join('');
-  sel.value = 'ano';
+  ops.push('<option value="custom">Intervalo personalizado…</option>');
+  sel.innerHTML = ops.join(''); sel.value = 'ano';
+  document.getElementById('analiseMesDe').innerHTML = '<option value="">ou do mês…</option>' + mopt.join('');
+  document.getElementById('analiseMesAte').innerHTML = '<option value="">…até o mês</option>' + mopt.join('');
+  const ini = new Date(hoje.getFullYear(), hoje.getMonth()-2, 1);
+  document.getElementById('analiseDe').value = dStr(ini); document.getElementById('analiseAte').value = hojeStr();
+}
+function aoMudarPeriodoAnalise(){
+  document.getElementById('analiseCustom').style.display = document.getElementById('analisePeriodo').value==='custom' ? 'flex' : 'none';
+  renderAnalises();
+}
+function aplicarMesAnalise(qual){
+  const sel = document.getElementById('analiseMes'+qual); const m = sel.value; if(!m) return;
+  const [y,mm] = m.split('-').map(Number);
+  document.getElementById('analise'+qual).value = qual==='De' ? `${m}-01` : dStr(new Date(y,mm,0));
+  sel.value = ''; renderAnalises();
 }
 function deslocaRange(r, meses){
   const i = new Date(r.ini+'T00:00:00'); i.setMonth(i.getMonth()+meses);
@@ -1157,22 +1190,31 @@ function deslocaRange(r, meses){
 }
 function rangeAnalise(){
   const v = document.getElementById('analisePeriodo').value;
-  const hoje = new Date(); let r;
+  const hoje = new Date(); let r; const y = hoje.getFullYear();
   if(v.startsWith('m:')){
-    const [y,m] = v.slice(2).split('-').map(Number);
-    r = { ini:dStr(new Date(y,m-1,1)), fim:dStr(new Date(y,m,0)), nome:mesLabel(v.slice(2)) };
+    const [yy,m] = v.slice(2).split('-').map(Number);
+    r = { ini:dStr(new Date(yy,m-1,1)), fim:dStr(new Date(yy,m,0)), nome:mesLabel(v.slice(2)) };
     r.prev = { ...deslocaRange(r,-1), nome:'mês anterior' };
     r.yoy = { ...deslocaRange(r,-12), nome:'mesmo mês do ano passado' };
-  } else if(v==='u3'){
-    r = { ini:dStr(new Date(hoje.getFullYear(),hoje.getMonth()-2,1)), fim:dStr(new Date(hoje.getFullYear(),hoje.getMonth()+1,0)), nome:'últimos 3 meses' };
-    r.prev = { ...deslocaRange(r,-3), nome:'3 meses anteriores' };
+  } else if(v.startsWith('n:')){
+    const n = +v.slice(2);
+    r = { ini:dStr(new Date(y,hoje.getMonth()-(n-1),1)), fim:dStr(new Date(y,hoje.getMonth()+1,0)), nome:`últimos ${n} meses` };
+    r.prev = { ...deslocaRange(r,-n), nome:`${n} meses anteriores` };
     r.yoy = { ...deslocaRange(r,-12), nome:'mesmo período do ano passado' };
-  } else if(v==='ano'){
-    r = { ini:`${hoje.getFullYear()}-01-01`, fim:`${hoje.getFullYear()}-12-31`, nome:`ano de ${hoje.getFullYear()}` };
-    r.prev = null;
-    r.yoy = { ...deslocaRange(r,-12), nome:'ano passado' };
+  } else if(v==='ano' || v==='anoant'){
+    const ay = v==='ano' ? y : y-1;
+    r = { ini:`${ay}-01-01`, fim:`${ay}-12-31`, nome:`ano de ${ay}`, prev:null };
+    r.yoy = { ...deslocaRange(r,-12), nome:'ano anterior' };
+  } else if(v==='custom'){
+    let ini = document.getElementById('analiseDe').value || hojeStr(), fim = document.getElementById('analiseAte').value || hojeStr();
+    if(ini>fim) [ini,fim] = [fim,ini];
+    const len = diffDias(fim,ini)+1;
+    r = { ini, fim, nome:`${fmtBR(ini)} a ${fmtBR(fim)}` };
+    r.prev = { ini:addDias(ini,-len), fim:addDias(ini,-1), nome:'período anterior' };
+    const yi = new Date(ini+'T00:00:00'); yi.setFullYear(yi.getFullYear()-1); const yf = new Date(fim+'T00:00:00'); yf.setFullYear(yf.getFullYear()-1);
+    r.yoy = { ini:dStr(yi), fim:dStr(yf), nome:'mesmo período do ano passado' };
   } else {
-    r = { ini:'1900-01-01', fim:'2999-12-31', nome:'todo o período' }; r.prev = null; r.yoy = null;
+    r = { ini:'1900-01-01', fim:'2999-12-31', nome:'todo o período', prev:null, yoy:null };
   }
   return r;
 }
@@ -1233,8 +1275,11 @@ function renderAnalises(){
 
   // metas do período
   const meses = mesesDoRange(r);
+  const porVend = agruparPor(recs, x=>x.vendedor);
+  // lista: todo vendedor ativo (mesmo sem venda) + ex-vendedor só se tiver venda no período
+  const nomes = [...new Set([...vendedoresConhecidos, ...Object.keys(porVend).filter(n=>porVend[n].qtd>0)])];
   const metaV = {}; let metaTime = 0;
-  todasMetas.filter(m=>meses.includes(m.mes)).forEach(m=>{ metaV[m.vendedor]=(metaV[m.vendedor]||0)+(+m.meta_comissao||0); metaTime += (+m.meta_comissao||0); });
+  todasMetas.filter(m=>meses.includes(m.mes) && nomes.includes(m.vendedor)).forEach(m=>{ metaV[m.vendedor]=(metaV[m.vendedor]||0)+(+m.meta_comissao||0); metaTime += (+m.meta_comissao||0); });
 
   document.getElementById('analiseCards').innerHTML =
     statAnalise(caixa?'Recebido no período':'Comissão líquida', tot.valor, fmtMoeda, tot.valor, ant.valor, yoy.valor, r) +
@@ -1244,8 +1289,6 @@ function renderAnalises(){
     `<div class="card stat-card"><div class="label">Meta do time</div><div class="value">${metaTime>0?fmtMoeda(metaTime):'—'}</div><div class="delta" style="color:var(--text-2)">${metaTime>0?`${(tot.valor/metaTime*100).toFixed(0)}% atingido`:'sem meta definida no período'}</div></div>`;
 
   // vendedores
-  const porVend = agruparPor(recs, x=>x.vendedor);
-  const nomes = [...new Set([...vendedoresConhecidos, ...Object.keys(porVend), ...Object.keys(metaV)])].filter(n=>porVend[n]||metaV[n]);
   const linhasV = nomes.map(n=>({n, a:porVend[n]||{qtd:0,mensal:0,valor:0,ticket:0}, meta:metaV[n]||0})).sort((x,y)=>y.a.valor-x.a.valor);
 
   document.getElementById('analiseMetaTitulo').textContent = 'Meta x realizado — ' + r.nome + (caixa?' (recebido)':' (comissão líquida)');
@@ -1291,14 +1334,59 @@ function renderAnalises(){
   const c300 = recs.filter(x=>x.categoria==='300').reduce((s,x)=>s+x.valor,0);
   document.getElementById('chartCategoria').innerHTML = (c200||c300) ? barChart([{label:'200%',v:c200},{label:'300%',v:c300}], ()=>'#2A3568') : '<div class="empty">Sem dados no período.</div>';
 
-  // evolução 6 meses (na base escolhida, independente do filtro)
-  const hoje = new Date(); const evData = [];
-  for(let i=5;i>=0;i--){
-    const d = new Date(hoje.getFullYear(), hoje.getMonth()-i, 1); const m = `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
-    const ini = `${m}-01`, fim = dStr(new Date(d.getFullYear(), d.getMonth()+1, 0));
-    evData.push({label:mesLabel(m), v:registrosAnalise(base, ini, fim).reduce((s,x)=>s+x.valor,0)});
+  renderEvolucaoAnalise();
+}
+function lineChartMulti(labels, series, fmt){
+  const W=720, H=270, padL=64, padR=52, padT=34, padB=40;
+  const innerW=W-padL-padR, innerH=H-padT-padB, n=labels.length;
+  const max = Math.max(...series.flatMap(s=>s.vals), 1);
+  const x = i => padL + (n===1 ? innerW/2 : innerW*i/(n-1));
+  const y = v => padT + innerH - (v/max)*innerH;
+  const grid = [0,0.25,0.5,0.75,1].map(f=>{ const yy=padT+innerH-f*innerH; return `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="#DDE0EC"/><text x="${padL-8}" y="${yy+4}" text-anchor="end" font-size="10.5" fill="#9C9890">${fmt(max*f).replace('R$','').trim()}</text>`; }).join('');
+  const pulo = n>12 ? 2 : 1;
+  const lab = labels.map((l,i)=> i%pulo ? '' : `<text x="${x(i)}" y="${H-14}" text-anchor="middle" font-size="${n>8?10:11.5}" fill="#5C5850">${l}</text>`).join('');
+  const linhas = series.map((s,si)=>{
+    const pts = s.vals.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+    const dots = s.vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="${si?3:4}" fill="${s.cor}" stroke="#fff" stroke-width="1.5"/>${(n<=9||si===0&&n<=14)?`<text x="${x(i)}" y="${y(v)+(si?18:-10)}" text-anchor="middle" font-size="10.5" font-weight="${si?400:600}" fill="${s.cor}">${fmt(v)}</text>`:''}`).join('');
+    return `${si===0?`<polygon points="${x(0)},${padT+innerH} ${pts} ${x(n-1)},${padT+innerH}" fill="${s.cor}" opacity="0.08"/>`:''}<polyline points="${pts}" fill="none" stroke="${s.cor}" stroke-width="${si?2:2.5}" ${s.tracejado?'stroke-dasharray="6 5"':''} stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+  }).join('');
+  const leg = series.length>1 ? series.map((s,i)=>`<g transform="translate(${padL+i*230},14)"><line x1="0" y1="0" x2="22" y2="0" stroke="${s.cor}" stroke-width="2.5" ${s.tracejado?'stroke-dasharray="6 5"':''}/><text x="28" y="4" font-size="11.5" fill="#5C5850">${s.nome}</text></g>`).join('') : '';
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:${W}px;font-family:'DM Sans',sans-serif" xmlns="http://www.w3.org/2000/svg">${grid}${linhas}${lab}${leg}</svg>`;
+}
+const MES_CURTO = d => `${MESES_ABR[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
+function renderEvolucaoAnalise(){
+  if(currentProfile?.role!=='gestor') return;
+  const base = document.getElementById('analiseBase').value;
+  // listas de vendedor / operadora (mantém a escolha)
+  const sv = document.getElementById('evVend'), so = document.getElementById('evOp');
+  const cv = sv.value, co = so.value;
+  const vens = [...new Set([...vendedoresConhecidos, ...todasVendas.map(v=>v.vendedor)])].filter(Boolean).sort();
+  sv.innerHTML = '<option value="">Todo o time</option>' + vens.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join(''); sv.value = vens.includes(cv)?cv:'';
+  so.innerHTML = '<option value="">Todas as operadoras</option>' + Object.keys(OPERADORA_LABEL).map(k=>`<option value="${k}">${OPERADORA_LABEL[k]}</option>`).join(''); so.value = OPERADORA_LABEL[co]?co:'';
+  document.getElementById('evMetricaValor').textContent = base==='caixa' ? 'Recebido (líquido)' : 'Comissão líquida';
+
+  const nMeses = +document.getElementById('evMeses').value, grp = +document.getElementById('evGrupo').value;
+  const metrica = document.getElementById('evMetrica').value, comp = document.getElementById('evComp').value;
+  const fv = sv.value, fo = so.value;
+  const hoje = new Date(); const nB = Math.ceil(nMeses/grp); const buckets = [];
+  for(let k=nB-1;k>=0;k--){
+    const ultimo = new Date(hoje.getFullYear(), hoje.getMonth()-k*grp, 1);
+    const primeiro = new Date(hoje.getFullYear(), hoje.getMonth()-Math.min(k*grp+grp-1, nMeses-1), 1);
+    buckets.push({ ini:dStr(primeiro), fim:dStr(new Date(ultimo.getFullYear(), ultimo.getMonth()+1, 0)),
+      label: (primeiro.getTime()===ultimo.getTime()) ? MES_CURTO(primeiro) : `${MES_CURTO(primeiro)}–${MES_CURTO(ultimo)}` });
   }
-  document.getElementById('chartEvolucao').innerHTML = lineChartSVG(evData, '#4A5899');
+  const val = (ini,fim)=>{ const recs = registrosAnalise(base, ini, fim).filter(x=>(!fv||x.vendedor===fv)&&(!fo||x.operadora===fo)); return agregarAnalise(recs)[metrica]; };
+  const ehMoeda = metrica!=='qtd';
+  const fmt = v => ehMoeda ? fmtMoeda(v) : String(Math.round(v));
+  const nomeMetrica = {valor: base==='caixa'?'Recebido (líquido)':'Comissão líquida', qtd:'Nº de vendas', mensal:'Mensalidade total', ticket:'Ticket médio'}[metrica];
+  const escopo = [fv||'Todo o time', fo?OPERADORA_LABEL[fo]:null].filter(Boolean).join(' · ');
+  const series = [{ nome:`${nomeMetrica} — ${escopo}`, cor:'#2A3568', vals:buckets.map(b=>val(b.ini,b.fim)) }];
+  if(comp){
+    const shift = comp==='ano' ? -12 : -grp;
+    series.push({ nome: comp==='ano' ? 'Mesmo período do ano passado' : 'Período anterior', cor:'#E8A020', tracejado:true, vals:buckets.map(b=>{ const s=deslocaRange(b,shift); return val(s.ini,s.fim); }) });
+  }
+  const vazio = series.every(s=>s.vals.every(v=>!v));
+  document.getElementById('chartEvolucao').innerHTML = vazio ? '<div class="empty">Sem dados para essa combinação.</div>' : lineChartMulti(buckets.map(b=>b.label), series, fmt);
 }
 
 /* ===== VENDAS ===== */
