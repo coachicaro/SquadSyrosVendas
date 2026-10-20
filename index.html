@@ -221,7 +221,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <div class="nav-item" data-view="propostas" onclick="showView('propostas')">📄 Propostas</div>
     <div class="nav-item" data-view="origem" onclick="showView('origem')">🔗 Origem</div>
     <div class="nav-item" id="navFinanceiro" data-view="financeiro" onclick="showView('financeiro')" style="display:none">🏦 Financeiro</div>
-    <div class="nav-item" id="navLeads" data-view="leads" onclick="showView('leads')" style="display:none">🧲 Leads</div>
+    <div class="nav-item" id="navLeads" data-view="leads" onclick="showView('leads')" style="display:none">🧲 Funil</div>
     <div class="nav-item" data-view="exportar" onclick="showView('exportar')">📤 Exportar</div>
     <div class="sidebar-footer">
       <div class="who" id="whoAmI">—</div>
@@ -307,11 +307,14 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
 
     <!-- LEADS -->
     <div id="view-leads" style="display:none">
-      <h1 class="page-title">Leads</h1>
-      <div class="page-sub">Funil semanal do canal de marketing — da geração ao fechamento</div>
-      <div class="row"><select id="leadsPeriodo" onchange="renderLeads()">
-        <option value="4">Últimas 4 semanas</option><option value="8">Últimas 8 semanas</option><option value="12">Últimas 12 semanas</option><option value="0">Tudo</option>
-      </select></div>
+      <h1 class="page-title">Funil</h1>
+      <div class="page-sub">Funil comercial semanal e mensal — da geração de leads ao fechamento</div>
+      <div class="row">
+        <select id="leadsVisao" onchange="aoMudarVisaoLeads()"><option value="sem">Visão semanal</option><option value="mes">Visão mensal</option></select>
+        <select id="leadsPeriodo" onchange="renderLeads()">
+          <option value="4">Últimas 4 semanas</option><option value="8">Últimas 8 semanas</option><option value="12">Últimas 12 semanas</option><option value="0">Tudo</option>
+        </select>
+      </div>
       <div class="grid-cards" id="leadsCards"></div>
       <div class="card" style="margin-bottom:16px"><h3 style="margin-bottom:14px">Funil do período</h3><div id="leadsFunil"></div></div>
       <div class="card" style="margin-bottom:16px">
@@ -330,8 +333,12 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
           <button class="btn" onclick="preencherPropostasFechamentos()">Preencher propostas e fechamentos pelo sistema</button>
         </div>
       </div>
-      <div class="card" style="padding:0;overflow-x:auto">
+      <div class="card" style="padding:0;overflow-x:auto" id="wrapLeadsSem">
         <table id="tabelaLeads"><thead><tr><th>Semana</th><th>Leads</th><th>Qualificados</th><th>Agendados</th><th>Propostas</th><th>Fechamentos</th><th>Lead → venda</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="card" style="padding:0;overflow-x:auto;display:none" id="wrapLeadsMes">
+        <table id="tabelaLeadsMes"><thead><tr><th>Mês</th><th>Semanas</th><th>Leads</th><th>Qualificados</th><th>Agendados</th><th>Propostas</th><th>Fechamentos</th><th>Qualif.</th><th>Agend.</th><th>Proposta</th><th>Fechou</th><th>Lead → venda</th></tr></thead><tbody></tbody></table>
+        <div class="hint" style="margin:0;padding:10px 16px">Cada semana entra no mês em que ela começa (segunda-feira). Os percentuais mostram quanto passa de uma etapa para a seguinte.</div>
       </div>
     </div>
 
@@ -927,12 +934,37 @@ function segundaDe(dataStr){
 }
 function fmtSemana(s){ const fim = addDias(s,6); const f=x=>x.split('-').reverse().slice(0,2).join('/'); return `${f(s)} a ${f(fim)}`; }
 function pctTxt(a,b){ return b>0 ? (a/b*100).toFixed(0)+'%' : '—'; }
+const MESES_ABR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+function visaoLeads(){ return document.getElementById('leadsVisao').value; }
+function aoMudarVisaoLeads(){
+  const sel = document.getElementById('leadsPeriodo');
+  sel.innerHTML = visaoLeads()==='mes'
+    ? '<option value="3">Últimos 3 meses</option><option value="6">Últimos 6 meses</option><option value="12">Últimos 12 meses</option><option value="0">Tudo</option>'
+    : '<option value="4">Últimas 4 semanas</option><option value="8">Últimas 8 semanas</option><option value="12">Últimas 12 semanas</option><option value="0">Tudo</option>';
+  renderLeads();
+}
 function semanasDoPeriodo(){
   const n = parseInt(document.getElementById('leadsPeriodo').value)||0;
   if(!n) return todoFunilSemanal;
+  if(visaoLeads()==='mes'){
+    const d = new Date(hojeStr()+'T00:00:00'); d.setDate(1); d.setMonth(d.getMonth()-(n-1));
+    const corte = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+    return todoFunilSemanal.filter(s=>s.semana_inicio>=corte);
+  }
   const corte = addDias(segundaDe(hojeStr()), -7*(n-1));
   return todoFunilSemanal.filter(s=>s.semana_inicio>=corte);
 }
+function agruparLeadsPorMes(sem){
+  const m = {};
+  sem.forEach(s=>{
+    const k = s.semana_inicio.slice(0,7);
+    m[k] = m[k] || {mes:k, n:0, leads_gerados:0, qualificados:0, agendados:0, propostas:0, fechamentos:0};
+    m[k].n++;
+    LEAD_ETAPAS.forEach(([,c])=>{ m[k][c] += (+s[c]||0); });
+  });
+  return Object.values(m).sort((a,b)=>b.mes.localeCompare(a.mes));
+}
+function fmtMesLeads(k){ const [y,mm]=k.split('-'); return `${MESES_ABR[+mm-1]}/${y.slice(2)}`; }
 function renderLeads(){
   if(currentProfile?.role!=='gestor') return;
   if(!document.getElementById('lfSemana').value) document.getElementById('lfSemana').value = hojeStr();
@@ -940,13 +972,17 @@ function renderLeads(){
   const soma = k => sem.reduce((s,x)=>s+(+x[k]||0),0);
   const tot = Object.fromEntries(LEAD_ETAPAS.map(([,k])=>[k,soma(k)]));
   const nSem = sem.length;
-  const leadsSem = sem.map(s=>+s.leads_gerados||0);
+  const mensal = visaoLeads()==='mes';
+  const meses = mensal ? agruparLeadsPorMes(sem) : [];
+  const leadsSem = (mensal ? meses.map(x=>x.leads_gerados) : sem.map(s=>+s.leads_gerados||0));
+  const nUn = mensal ? meses.length : nSem;
+  const un = mensal ? 'mês' : 'semana';
 
   document.getElementById('leadsCards').innerHTML = `
-    <div class="card stat-card"><div class="label">Leads por semana (média)</div><div class="value">${nSem?(tot.leads_gerados/nSem).toFixed(0):'—'}</div><div class="delta" style="color:var(--text-2)">${nSem?`variando de ${Math.min(...leadsSem)} a ${Math.max(...leadsSem)}`:'sem semanas lançadas'}</div></div>
+    <div class="card stat-card"><div class="label">Leads por ${un} (média)</div><div class="value">${nUn?(tot.leads_gerados/nUn).toFixed(0):'—'}</div><div class="delta" style="color:var(--text-2)">${nUn?`variando de ${Math.min(...leadsSem)} a ${Math.max(...leadsSem)}`:'sem semanas lançadas'}</div></div>
     <div class="card stat-card"><div class="label">Lead → venda</div><div class="value">${pctTxt(tot.fechamentos,tot.leads_gerados)}</div><div class="delta" style="color:var(--text-2)">${tot.fechamentos} fechamento${tot.fechamentos===1?'':'s'} em ${tot.leads_gerados} leads</div></div>
     <div class="card stat-card"><div class="label">Qualificação</div><div class="value">${pctTxt(tot.qualificados,tot.leads_gerados)}</div><div class="delta" style="color:var(--text-2)">dos leads são qualificados</div></div>
-    <div class="card stat-card"><div class="label">Semanas lançadas</div><div class="value">${nSem}</div></div>`;
+    <div class="card stat-card"><div class="label">${mensal?'Meses no período':'Semanas lançadas'}</div><div class="value">${nUn}</div>${mensal?`<div class="delta" style="color:var(--text-2)">${nSem} semana${nSem===1?'':'s'} lançada${nSem===1?'':'s'}</div>`:''}</div>`;
 
   // funil
   if(!nSem || !tot.leads_gerados){
@@ -969,7 +1005,17 @@ function renderLeads(){
     document.getElementById('leadsFunil').innerHTML = partes + (pior?`<div class="hint" style="margin-top:12px;color:#8A5A0B"><strong>Maior vazamento:</strong> ${pior.de} → ${pior.para} (${(pior.taxa*100).toFixed(0)}%). É onde mais se perde.</div>`:'');
   }
 
-  // tabela
+  // tabela mensal
+  document.getElementById('wrapLeadsSem').style.display = mensal ? 'none' : '';
+  document.getElementById('wrapLeadsMes').style.display = mensal ? '' : 'none';
+  if(mensal){
+    document.querySelector('#tabelaLeadsMes tbody').innerHTML = meses.length ? meses.map(x=>`<tr>
+      <td><strong>${fmtMesLeads(x.mes)}</strong></td><td>${x.n}</td><td>${x.leads_gerados}</td><td>${x.qualificados}</td><td>${x.agendados}</td><td>${x.propostas}</td><td>${x.fechamentos}</td>
+      <td>${pctTxt(x.qualificados,x.leads_gerados)}</td><td>${pctTxt(x.agendados,x.qualificados)}</td><td>${pctTxt(x.propostas,x.agendados)}</td><td>${pctTxt(x.fechamentos,x.propostas)}</td>
+      <td><strong>${pctTxt(x.fechamentos,x.leads_gerados)}</strong></td></tr>`).join('')
+      : '<tr><td colspan="12" class="empty">Nenhuma semana lançada neste período.</td></tr>';
+  }
+  // tabela semanal
   const tbody = document.querySelector('#tabelaLeads tbody');
   tbody.innerHTML = todoFunilSemanal.length ? todoFunilSemanal.map(s=>`<tr style="cursor:pointer" onclick='carregarSemanaNoForm(${JSON.stringify(s).replace(/'/g,"&apos;")})'>
     <td>${fmtSemana(s.semana_inicio)}</td><td>${s.leads_gerados}</td><td>${s.qualificados}</td><td>${s.agendados}</td><td>${s.propostas}</td><td>${s.fechamentos}</td>
