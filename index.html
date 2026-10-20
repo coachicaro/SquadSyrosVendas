@@ -214,7 +214,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
   <div class="sidebar">
     <div class="brand">Syros Financial<small>Planos de Saúde</small></div>
     <div class="nav-item active" data-view="dashboard" onclick="showView('dashboard')">📊 Dashboard</div>
-    <div class="nav-item" data-view="analises" onclick="showView('analises')">📈 Análises</div>
+    <div class="nav-item" id="navAnalises" data-view="analises" onclick="showView('analises')" style="display:none">📈 Análises</div>
     <div class="nav-item" data-view="vendas" onclick="showView('vendas')">🧾 Vendas</div>
     <div class="nav-item" data-view="producao" onclick="showView('producao')">💰 Produção</div>
     <div class="nav-item" data-view="metas" onclick="showView('metas')">🎯 Metas</div>
@@ -245,15 +245,36 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <!-- ANALISES -->
     <div id="view-analises" style="display:none">
       <h1 class="page-title">Análises</h1>
-      <div class="page-sub">Comissão por categoria (200% / 300%), operadoras e evolução mensal</div>
+      <div class="page-sub">Indicadores do time por período — vendedores, operadoras, meta e comparativos</div>
+      <div class="row">
+        <select id="analisePeriodo" onchange="renderAnalises()"></select>
+        <select id="analiseBase" onchange="renderAnalises()">
+          <option value="venda">Base: data da venda (competência)</option>
+          <option value="caixa">Base: data do recebimento (caixa)</option>
+        </select>
+      </div>
+      <div class="hint" id="analiseHint" style="margin:0 0 14px"></div>
       <div class="grid-cards" id="analiseCards"></div>
       <div class="card" style="margin-bottom:16px">
-        <h3 style="margin-bottom:14px">Comissão líquida por categoria de comissão</h3>
-        <div id="chartCategoria"></div>
+        <h3 style="margin-bottom:14px" id="analiseMetaTitulo">Meta x realizado</h3>
+        <div id="analiseMeta"></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;padding:0;overflow-x:auto">
+        <h3 style="margin:16px 16px 4px">Por vendedor</h3>
+        <table id="tabelaAnaliseVend"><thead><tr><th>Vendedor</th><th>Vendas</th><th>Mensalidade total</th><th>Ticket médio</th><th id="thValorVend">Comissão líquida</th><th>% do time</th><th>Meta</th><th>% da meta</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="card" style="margin-bottom:16px;padding:0;overflow-x:auto">
+        <h3 style="margin:16px 16px 4px">Por operadora</h3>
+        <table id="tabelaAnaliseOp"><thead><tr><th>Operadora</th><th>Vendas</th><th>Mensalidade total</th><th>Ticket médio</th><th id="thValorOp">Comissão líquida</th><th>Participação</th></tr></thead><tbody></tbody></table>
       </div>
       <div class="card" style="margin-bottom:16px">
-        <h3 style="margin-bottom:14px">Top operadoras (comissão líquida)</h3>
-        <div id="chartOperadora"></div>
+        <h3 style="margin-bottom:4px">Faixa de mensalidade</h3>
+        <div class="hint" style="margin:0 0 14px">Quantas vendas caem em cada faixa de valor da mensalidade (perfil do cliente).</div>
+        <div id="chartFaixa"></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin-bottom:14px" id="tituloCategoria">Comissão líquida por categoria (200% = DoctorClin/MedSênior · 300% = Amil/Bradesco/SulAmérica)</h3>
+        <div id="chartCategoria"></div>
       </div>
       <div class="card">
         <h3 style="margin-bottom:14px">Evolução — últimos 6 meses</h3>
@@ -642,6 +663,7 @@ async function afterLogin(user){
   document.getElementById('whoAmI').textContent = profile.nome + (profile.role==='gestor' ? ' · Gestor' : '');
   document.getElementById('navFinanceiro').style.display = profile.role==='gestor' ? 'flex' : 'none';
   document.getElementById('navExportar').style.display = profile.role==='gestor' ? 'flex' : 'none';
+  document.getElementById('navAnalises').style.display = profile.role==='gestor' ? 'flex' : 'none';
   await carregarTudo();
   showView('dashboard');
   setupRealtime();
@@ -722,7 +744,7 @@ function popularSelectsVendedor(){
 
 /* ===== NAV ===== */
 function showView(view){
-  if(currentProfile?.role!=='gestor' && (view==='financeiro'||view==='exportar')) view='dashboard';
+  if(currentProfile?.role!=='gestor' && (view==='financeiro'||view==='exportar'||view==='analises')) view='dashboard';
   document.querySelectorAll('[id^=view-]').forEach(el=>el.style.display='none');
   document.getElementById('view-'+view).style.display='block';
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active', el.dataset.view===view));
@@ -1113,28 +1135,169 @@ function barChart(data, colorFn){
       </div>
     </div>`).join('');
 }
+/* ===== ANÁLISES (gestor) ===== */
+const pad2 = n => String(n).padStart(2,'0');
+const dStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+function popularPeriodoAnalise(){
+  const sel = document.getElementById('analisePeriodo');
+  if(sel.options.length) return;
+  const hoje = new Date(); let ops = [];
+  for(let i=0;i<6;i++){ const d = new Date(hoje.getFullYear(), hoje.getMonth()-i, 1); const m=`${d.getFullYear()}-${pad2(d.getMonth()+1)}`; ops.push(`<option value="m:${m}">${mesLabel(m)}${i===0?' (mês atual)':''}</option>`); }
+  ops.push('<option value="u3">Últimos 3 meses</option>');
+  ops.push(`<option value="ano">Ano de ${hoje.getFullYear()}</option>`);
+  ops.push('<option value="tudo">Tudo</option>');
+  sel.innerHTML = ops.join('');
+  sel.value = 'ano';
+}
+function deslocaRange(r, meses){
+  const i = new Date(r.ini+'T00:00:00'); i.setMonth(i.getMonth()+meses);
+  const fimBase = new Date(r.fim+'T00:00:00');
+  const f = new Date(fimBase.getFullYear(), fimBase.getMonth()+meses+1, 0);
+  return { ini:dStr(i), fim:dStr(f) };
+}
+function rangeAnalise(){
+  const v = document.getElementById('analisePeriodo').value;
+  const hoje = new Date(); let r;
+  if(v.startsWith('m:')){
+    const [y,m] = v.slice(2).split('-').map(Number);
+    r = { ini:dStr(new Date(y,m-1,1)), fim:dStr(new Date(y,m,0)), nome:mesLabel(v.slice(2)) };
+    r.prev = { ...deslocaRange(r,-1), nome:'mês anterior' };
+    r.yoy = { ...deslocaRange(r,-12), nome:'mesmo mês do ano passado' };
+  } else if(v==='u3'){
+    r = { ini:dStr(new Date(hoje.getFullYear(),hoje.getMonth()-2,1)), fim:dStr(new Date(hoje.getFullYear(),hoje.getMonth()+1,0)), nome:'últimos 3 meses' };
+    r.prev = { ...deslocaRange(r,-3), nome:'3 meses anteriores' };
+    r.yoy = { ...deslocaRange(r,-12), nome:'mesmo período do ano passado' };
+  } else if(v==='ano'){
+    r = { ini:`${hoje.getFullYear()}-01-01`, fim:`${hoje.getFullYear()}-12-31`, nome:`ano de ${hoje.getFullYear()}` };
+    r.prev = null;
+    r.yoy = { ...deslocaRange(r,-12), nome:'ano passado' };
+  } else {
+    r = { ini:'1900-01-01', fim:'2999-12-31', nome:'todo o período' }; r.prev = null; r.yoy = null;
+  }
+  return r;
+}
+function registrosAnalise(base, ini, fim){
+  if(base==='caixa'){
+    return todosRecebimentos.filter(r=>r.data_recebido && r.data_recebido>=ini && r.data_recebido<=fim).map(r=>{
+      const v = todasVendas.find(x=>x.id===r.venda_id) || {};
+      return { vid:r.venda_id, vendedor:r.venda?.vendedor||v.vendedor||'—', operadora:r.venda?.operadora||v.operadora||'—', categoria:v.categoria||'200', parcela:+v.parcela||0, valor:+r.valor||0, data:r.data_recebido };
+    });
+  }
+  return todasVendas.filter(v=>v.data>=ini && v.data<=fim).map(v=>({ vid:v.id, vendedor:v.vendedor, operadora:v.operadora, categoria:v.categoria, parcela:+v.parcela||0, valor:+v.comissao_liquida||0, data:v.data }));
+}
+function agregarAnalise(recs){
+  const vs = new Map(); let valor = 0;
+  recs.forEach(r=>{ valor += r.valor; if(!vs.has(r.vid)) vs.set(r.vid, r.parcela); });
+  const qtd = vs.size, mensal = [...vs.values()].reduce((a,b)=>a+b,0);
+  return { qtd, mensal, valor, ticket: qtd?mensal/qtd:0, pagamentos: recs.length };
+}
+function agruparPor(recs, fn){
+  const m = {}; recs.forEach(r=>{ const k=fn(r); (m[k]=m[k]||[]).push(r); });
+  return Object.fromEntries(Object.entries(m).map(([k,v])=>[k,agregarAnalise(v)]));
+}
+function mesesDoRange(r, recs){
+  let ini = r.ini, fim = r.fim;
+  if(ini==='1900-01-01'){ const ds = [...todasVendas.map(v=>v.data), ...todasMetas.map(m=>m.mes+'-01')].filter(Boolean).sort(); ini = ds[0] || hojeStr(); fim = hojeStr(); }
+  const out = []; let d = new Date(ini.slice(0,7)+'-01T00:00:00'); const f = new Date(fim.slice(0,7)+'-01T00:00:00');
+  while(d<=f){ out.push(`${d.getFullYear()}-${pad2(d.getMonth()+1)}`); d.setMonth(d.getMonth()+1); }
+  return out;
+}
+function deltaHTML(cur, ant, nome, moeda){
+  if(!(ant>0)) return `<div class="delta" style="color:var(--text-3)">sem dados em ${nome}</div>`;
+  const pct = (cur/ant-1)*100; const up = pct>=0;
+  return `<div class="delta ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(pct).toFixed(0)}% vs ${nome}</div>`;
+}
+function statAnalise(label, valor, fmt, atual, ant, yoy, r){
+  return `<div class="card stat-card"><div class="label">${label}</div><div class="value">${fmt(valor)}</div>
+    ${r.prev?deltaHTML(atual, ant, r.prev.nome):''}${r.yoy?deltaHTML(atual, yoy, r.yoy.nome):''}</div>`;
+}
+const FAIXAS_MENSALIDADE = [['Até R$ 800',0,800],['R$ 800 a 1.199',800,1200],['R$ 1.200 a 1.799',1200,1800],['R$ 1.800 a 2.499',1800,2500],['R$ 2.500 ou mais',2500,Infinity]];
 function renderAnalises(){
-  const totalLiquida = todasVendas.reduce((s,v)=>s+(+v.comissao_liquida||0),0);
-  const cat200 = todasVendas.filter(v=>v.categoria==='200').reduce((s,v)=>s+(+v.comissao_liquida||0),0);
-  const cat300 = todasVendas.filter(v=>v.categoria==='300').reduce((s,v)=>s+(+v.comissao_liquida||0),0);
-  document.getElementById('analiseCards').innerHTML = `
-    <div class="card stat-card"><div class="label">Comissão líquida total</div><div class="value">${fmtMoeda(totalLiquida)}</div></div>
-    <div class="card stat-card"><div class="label">Categoria 200% (DoctorClin/MedSênior)</div><div class="value">${fmtMoeda(cat200)}</div></div>
-    <div class="card stat-card"><div class="label">Categoria 300% (Amil/Bradesco/SulAmérica)</div><div class="value">${fmtMoeda(cat300)}</div></div>
-  `;
-  document.getElementById('chartCategoria').innerHTML = barChart(
-    [{label:'200%',v:cat200},{label:'300%',v:cat300}], ()=> 'var(--accent)'
-  ).replace(/var\(--accent\)/g,'#2A3568');
+  if(currentProfile?.role!=='gestor') return;
+  popularPeriodoAnalise();
+  const base = document.getElementById('analiseBase').value;
+  const caixa = base==='caixa';
+  const r = rangeAnalise();
+  const nomeValor = caixa ? 'Recebido (líquido)' : 'Comissão líquida';
+  document.getElementById('analiseHint').textContent = caixa
+    ? 'Contando pelo que já entrou no caixa (parcelas marcadas como recebidas) no período. Valores líquidos de imposto.'
+    : 'Contando pelas vendas fechadas no período. Comissão líquida = bruta − 11%.';
+  document.getElementById('thValorVend').textContent = nomeValor;
+  document.getElementById('thValorOp').textContent = nomeValor;
+  document.getElementById('tituloCategoria').textContent = nomeValor + ' por categoria (200% = DoctorClin/MedSênior · 300% = Amil/Bradesco/SulAmérica)';
 
-  const porOp = {};
-  todasVendas.forEach(v=>{ porOp[v.operadora]=(porOp[v.operadora]||0)+(+v.comissao_liquida||0); });
-  const opData = Object.entries(porOp).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({label:OPERADORA_LABEL[k]||k,v}));
-  document.getElementById('chartOperadora').innerHTML = opData.length ? barChart(opData, ()=>'#2DB863') : '<div class="empty">Sem dados ainda.</div>';
+  const recs = registrosAnalise(base, r.ini, r.fim);
+  const tot = agregarAnalise(recs);
+  const ant = r.prev ? agregarAnalise(registrosAnalise(base, r.prev.ini, r.prev.fim)) : {qtd:0,valor:0,ticket:0,mensal:0};
+  const yoy = r.yoy ? agregarAnalise(registrosAnalise(base, r.yoy.ini, r.yoy.fim)) : {qtd:0,valor:0,ticket:0,mensal:0};
 
-  const hoje=new Date();
-  const meses6=[];
-  for(let i=5;i>=0;i--){ const d=new Date(hoje.getFullYear(),hoje.getMonth()-i,1); meses6.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
-  const evData = meses6.map(m=>({label:mesLabel(m), v:vendasDoMes(m).reduce((s,v)=>s+(+v.comissao_liquida||0),0)}));
+  // metas do período
+  const meses = mesesDoRange(r);
+  const metaV = {}; let metaTime = 0;
+  todasMetas.filter(m=>meses.includes(m.mes)).forEach(m=>{ metaV[m.vendedor]=(metaV[m.vendedor]||0)+(+m.meta_comissao||0); metaTime += (+m.meta_comissao||0); });
+
+  document.getElementById('analiseCards').innerHTML =
+    statAnalise(caixa?'Recebido no período':'Comissão líquida', tot.valor, fmtMoeda, tot.valor, ant.valor, yoy.valor, r) +
+    statAnalise(caixa?'Vendas com recebimento':'Vendas fechadas', tot.qtd, x=>x, tot.qtd, ant.qtd, yoy.qtd, r) +
+    statAnalise('Mensalidade total', tot.mensal, fmtMoeda, tot.mensal, ant.mensal, yoy.mensal, r) +
+    statAnalise('Ticket médio (mensalidade)', tot.ticket, fmtMoeda, tot.ticket, ant.ticket, yoy.ticket, r) +
+    `<div class="card stat-card"><div class="label">Meta do time</div><div class="value">${metaTime>0?fmtMoeda(metaTime):'—'}</div><div class="delta" style="color:var(--text-2)">${metaTime>0?`${(tot.valor/metaTime*100).toFixed(0)}% atingido`:'sem meta definida no período'}</div></div>`;
+
+  // vendedores
+  const porVend = agruparPor(recs, x=>x.vendedor);
+  const nomes = [...new Set([...vendedoresConhecidos, ...Object.keys(porVend), ...Object.keys(metaV)])].filter(n=>porVend[n]||metaV[n]);
+  const linhasV = nomes.map(n=>({n, a:porVend[n]||{qtd:0,mensal:0,valor:0,ticket:0}, meta:metaV[n]||0})).sort((x,y)=>y.a.valor-x.a.valor);
+
+  document.getElementById('analiseMetaTitulo').textContent = 'Meta x realizado — ' + r.nome + (caixa?' (recebido)':' (comissão líquida)');
+  const barraMeta = (nome, real, meta, forte)=>{
+    const pct = meta>0 ? real/meta*100 : null;
+    const cor = pct===null ? '#C5CAE0' : (pct>=100 ? '#2DB863' : '#4A5899');
+    return `<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span style="font-weight:${forte?600:500}">${escHtml(nome)}</span><span style="color:var(--text-2)">${fmtMoeda(real)}${meta>0?` de ${fmtMoeda(meta)} · <strong>${pct.toFixed(0)}%</strong>`:' · sem meta'}</span></div>
+      <div style="height:${forte?14:10}px;background:var(--bg);border-radius:6px;overflow:hidden"><div style="height:100%;width:${pct===null?0:Math.min(pct,100)}%;background:${cor};border-radius:6px"></div></div></div>`;
+  };
+  document.getElementById('analiseMeta').innerHTML = (metaTime>0 || linhasV.length)
+    ? barraMeta('Time', tot.valor, metaTime, true) + linhasV.map(l=>barraMeta(l.n, l.a.valor, l.meta, false)).join('')
+    : '<div class="empty">Sem dados no período.</div>';
+
+  document.querySelector('#tabelaAnaliseVend tbody').innerHTML = linhasV.length ? linhasV.map(l=>`<tr>
+    <td><strong>${escHtml(l.n)}</strong></td><td>${l.a.qtd}</td><td>${fmtMoeda(l.a.mensal)}</td><td>${l.a.qtd?fmtMoeda(l.a.ticket):'—'}</td>
+    <td><strong>${fmtMoeda(l.a.valor)}</strong></td><td>${tot.valor>0?(l.a.valor/tot.valor*100).toFixed(0)+'%':'—'}</td>
+    <td>${l.meta>0?fmtMoeda(l.meta):'—'}</td><td>${l.meta>0?(l.a.valor/l.meta*100).toFixed(0)+'%':'—'}</td></tr>`).join('')
+    + `<tr style="background:var(--bg)"><td><strong>Time</strong></td><td><strong>${tot.qtd}</strong></td><td><strong>${fmtMoeda(tot.mensal)}</strong></td><td><strong>${tot.qtd?fmtMoeda(tot.ticket):'—'}</strong></td><td><strong>${fmtMoeda(tot.valor)}</strong></td><td>100%</td><td>${metaTime>0?fmtMoeda(metaTime):'—'}</td><td>${metaTime>0?(tot.valor/metaTime*100).toFixed(0)+'%':'—'}</td></tr>`
+    : '<tr><td colspan="8" class="empty">Sem dados no período.</td></tr>';
+
+  // operadoras
+  const porOp = agruparPor(recs, x=>x.operadora);
+  const linhasO = Object.entries(porOp).sort((a,b)=>b[1].valor-a[1].valor);
+  document.querySelector('#tabelaAnaliseOp tbody').innerHTML = linhasO.length ? linhasO.map(([k,a])=>{
+    const part = tot.valor>0 ? a.valor/tot.valor*100 : 0;
+    return `<tr><td><strong>${escHtml(OPERADORA_LABEL[k]||k)}</strong></td><td>${a.qtd}</td><td>${fmtMoeda(a.mensal)}</td><td>${a.qtd?fmtMoeda(a.ticket):'—'}</td><td><strong>${fmtMoeda(a.valor)}</strong></td>
+      <td style="min-width:130px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="height:100%;width:${part}%;background:#2DB863"></div></div><span style="font-size:12px;color:var(--text-2);width:34px;text-align:right">${part.toFixed(0)}%</span></div></td></tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">Sem dados no período.</td></tr>';
+
+  // faixa de mensalidade (uma venda conta uma vez)
+  const vendasPer = new Map(); recs.forEach(x=>{ const c=vendasPer.get(x.vid)||{parcela:x.parcela,valor:0}; c.valor+=x.valor; vendasPer.set(x.vid,c); });
+  const faixa = FAIXAS_MENSALIDADE.map(([nome,lo,hi])=>{ const it=[...vendasPer.values()].filter(c=>c.parcela>=lo && c.parcela<hi); return {nome, n:it.length, valor:it.reduce((s,c)=>s+c.valor,0)}; });
+  const maxN = Math.max(...faixa.map(f=>f.n),1);
+  document.getElementById('chartFaixa').innerHTML = vendasPer.size ? faixa.map(f=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="width:130px;font-size:12.5px;color:var(--text-2);flex-shrink:0">${f.nome}</div>
+      <div style="flex:1;background:var(--bg);border-radius:6px;overflow:hidden;height:22px"><div style="height:100%;width:${f.n/maxN*100}%;background:#4A5899;display:flex;align-items:center;padding-left:${f.n?'8px':'0'};color:#fff;font-size:11px;font-weight:500;white-space:nowrap">${f.n?`${f.n} venda${f.n===1?'':'s'}`:''}</div></div>
+      <div style="width:110px;text-align:right;font-size:12px;color:var(--text-2)">${f.n?fmtMoeda(f.valor):'—'}</div>
+    </div>`).join('') : '<div class="empty">Sem dados no período.</div>';
+
+  // categoria
+  const c200 = recs.filter(x=>x.categoria==='200').reduce((s,x)=>s+x.valor,0);
+  const c300 = recs.filter(x=>x.categoria==='300').reduce((s,x)=>s+x.valor,0);
+  document.getElementById('chartCategoria').innerHTML = (c200||c300) ? barChart([{label:'200%',v:c200},{label:'300%',v:c300}], ()=>'#2A3568') : '<div class="empty">Sem dados no período.</div>';
+
+  // evolução 6 meses (na base escolhida, independente do filtro)
+  const hoje = new Date(); const evData = [];
+  for(let i=5;i>=0;i--){
+    const d = new Date(hoje.getFullYear(), hoje.getMonth()-i, 1); const m = `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
+    const ini = `${m}-01`, fim = dStr(new Date(d.getFullYear(), d.getMonth()+1, 0));
+    evData.push({label:mesLabel(m), v:registrosAnalise(base, ini, fim).reduce((s,x)=>s+x.valor,0)});
+  }
   document.getElementById('chartEvolucao').innerHTML = lineChartSVG(evData, '#4A5899');
 }
 
