@@ -221,8 +221,8 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <div class="nav-item" data-view="propostas" onclick="showView('propostas')">📄 Propostas</div>
     <div class="nav-item" data-view="origem" onclick="showView('origem')">🔗 Origem</div>
     <div class="nav-item" id="navFinanceiro" data-view="financeiro" onclick="showView('financeiro')" style="display:none">🏦 Financeiro</div>
-    <div class="nav-item" id="navLeads" data-view="leads" onclick="showView('leads')" style="display:none">🧲 Funil</div>
-    <div class="nav-item" data-view="exportar" onclick="showView('exportar')">📤 Exportar</div>
+    <div class="nav-item" id="navLeads" data-view="leads" onclick="showView('leads')">🧲 Funil</div>
+    <div class="nav-item" id="navExportar" data-view="exportar" onclick="showView('exportar')" style="display:none">📤 Exportar</div>
     <div class="sidebar-footer">
       <div class="who" id="whoAmI">—</div>
       <button onclick="doLogout()">Sair</button>
@@ -317,7 +317,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
       </div>
       <div class="grid-cards" id="leadsCards"></div>
       <div class="card" style="margin-bottom:16px"><h3 style="margin-bottom:14px">Funil do período</h3><div id="leadsFunil"></div></div>
-      <div class="card" style="margin-bottom:16px">
+      <div class="card" style="margin-bottom:16px" id="leadsForm">
         <h3 style="margin-bottom:4px">Lançar semana</h3>
         <div class="hint" style="margin:0 0 14px">Informe os números do relatório da semana. Lançar a mesma semana de novo atualiza os valores.</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px">
@@ -641,7 +641,7 @@ async function afterLogin(user){
   document.getElementById('app').classList.add('visible');
   document.getElementById('whoAmI').textContent = profile.nome + (profile.role==='gestor' ? ' · Gestor' : '');
   document.getElementById('navFinanceiro').style.display = profile.role==='gestor' ? 'flex' : 'none';
-  document.getElementById('navLeads').style.display = profile.role==='gestor' ? 'flex' : 'none';
+  document.getElementById('navExportar').style.display = profile.role==='gestor' ? 'flex' : 'none';
   await carregarTudo();
   showView('dashboard');
   setupRealtime();
@@ -684,7 +684,7 @@ async function carregarTudo(){
   todosRecebimentos = r||[];
   const {data:camp} = await sb.from('campanhas').select('*').order('data_fim',{ascending:true});
   todasCampanhas = camp||[];
-  if(currentProfile?.role==='gestor'){
+  {
     const {data:fs} = await sb.from('funil_semanal').select('*').order('semana_inicio',{ascending:false});
     todoFunilSemanal = fs||[];
   }
@@ -722,6 +722,7 @@ function popularSelectsVendedor(){
 
 /* ===== NAV ===== */
 function showView(view){
+  if(currentProfile?.role!=='gestor' && (view==='financeiro'||view==='exportar')) view='dashboard';
   document.querySelectorAll('[id^=view-]').forEach(el=>el.style.display='none');
   document.getElementById('view-'+view).style.display='block';
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active', el.dataset.view===view));
@@ -966,7 +967,8 @@ function agruparLeadsPorMes(sem){
 }
 function fmtMesLeads(k){ const [y,mm]=k.split('-'); return `${MESES_ABR[+mm-1]}/${y.slice(2)}`; }
 function renderLeads(){
-  if(currentProfile?.role!=='gestor') return;
+  const ehGestor = currentProfile?.role==='gestor';
+  document.getElementById('leadsForm').style.display = ehGestor ? '' : 'none';
   if(!document.getElementById('lfSemana').value) document.getElementById('lfSemana').value = hojeStr();
   const sem = semanasDoPeriodo();
   const soma = k => sem.reduce((s,x)=>s+(+x[k]||0),0);
@@ -1017,10 +1019,10 @@ function renderLeads(){
   }
   // tabela semanal
   const tbody = document.querySelector('#tabelaLeads tbody');
-  tbody.innerHTML = todoFunilSemanal.length ? todoFunilSemanal.map(s=>`<tr style="cursor:pointer" onclick='carregarSemanaNoForm(${JSON.stringify(s).replace(/'/g,"&apos;")})'>
+  tbody.innerHTML = todoFunilSemanal.length ? todoFunilSemanal.map(s=>`<tr ${ehGestor?`style="cursor:pointer" onclick='carregarSemanaNoForm(${JSON.stringify(s).replace(/'/g,"&apos;")})'`:''}>
     <td>${fmtSemana(s.semana_inicio)}</td><td>${s.leads_gerados}</td><td>${s.qualificados}</td><td>${s.agendados}</td><td>${s.propostas}</td><td>${s.fechamentos}</td>
     <td>${pctTxt(s.fechamentos,s.leads_gerados)}</td>
-    <td><button class="btn btn-danger" style="padding:4px 9px;font-size:11.5px" onclick="event.stopPropagation();excluirSemanaLeads('${s.id}')">Excluir</button></td></tr>`).join('')
+    <td>${ehGestor?`<button class="btn btn-danger" style="padding:4px 9px;font-size:11.5px" onclick="event.stopPropagation();excluirSemanaLeads('${s.id}')">Excluir</button>`:''}</td></tr>`).join('')
     : '<tr><td colspan="8" class="empty">Nenhuma semana lançada ainda.</td></tr>';
 }
 function setFormSemana(s){
@@ -1047,6 +1049,7 @@ function preencherPropostasFechamentos(){
   showToast('Preenchido com o que está no sistema nessa semana. Ajuste se precisar.');
 }
 async function salvarFunilSemana(){
+  if(currentProfile?.role!=='gestor') return;
   const dia = document.getElementById('lfSemana').value;
   if(!dia){ showToast('Escolha a semana.','error'); return; }
   const v = id => parseInt(document.getElementById(id).value)||0;
@@ -1061,6 +1064,7 @@ async function salvarFunilSemana(){
   await carregarTudo(); renderLeads();
 }
 async function excluirSemanaLeads(id){
+  if(currentProfile?.role!=='gestor') return;
   if(!confirm('Excluir esta semana?')) return;
   const {error} = await sb.from('funil_semanal').delete().eq('id',id);
   if(error){ showToast('Erro ao excluir.','error'); return; }
@@ -1141,13 +1145,17 @@ function atualizarPreviewComissao(){
   const {categoria,bruta,liquida} = calcComissao(parcela,operadora);
   document.getElementById('vPreview').innerHTML = `Categoria <strong>${categoria}%</strong> · Comissão bruta: <strong>${fmtMoeda(bruta)}</strong> · Líquida (−11%): <strong>${fmtMoeda(liquida)}</strong>`;
 }
+function ehGestor(){ return currentProfile?.role==='gestor'; }
+function podeEditarVenda(v){ return ehGestor() || (v && v.vendedor===currentProfile?.vendedor); }
 function openVendaModal(venda){
+  if(venda && !podeEditarVenda(venda)){ showToast('Você só pode editar as suas próprias vendas.','error'); return; }
   document.getElementById('modalVendaTitle').textContent = venda ? 'Editar venda' : 'Nova venda';
   document.getElementById('vendaId').value = venda?.id || '';
   document.getElementById('vCliente').value = venda?.cliente || '';
   document.getElementById('vData').value = venda?.data || new Date().toISOString().slice(0,10);
   popularSelectsVendedor();
   document.getElementById('vVendedor').value = venda?.vendedor || currentProfile?.vendedor || vendedoresConhecidos[0] || '';
+  document.getElementById('vVendedor').disabled = !ehGestor();
   document.getElementById('vOperadora').value = venda?.operadora || 'DoctorClin';
   document.getElementById('vParcela').value = venda?.parcela || '';
   document.getElementById('vOrigem').value = venda?.origem || 'Lead Marketing';
@@ -1159,7 +1167,7 @@ function openVendaModal(venda){
 async function salvarVenda(){
   const id = document.getElementById('vendaId').value;
   const cliente = document.getElementById('vCliente').value.trim();
-  const vendedor = document.getElementById('vVendedor').value;
+  const vendedor = ehGestor() ? document.getElementById('vVendedor').value : currentProfile?.vendedor;
   const operadora = document.getElementById('vOperadora').value;
   const parcela = parseFloat(document.getElementById('vParcela').value)||0;
   if(!cliente){ showToast('Informe o cliente.','error'); return; }
@@ -1206,6 +1214,8 @@ async function gerarRecebimentos(venda){
 async function excluirVenda(){
   const id = document.getElementById('vendaId').value;
   if(!id) return;
+  const alvo = todasVendas.find(v=>v.id===id);
+  if(!podeEditarVenda(alvo)){ showToast('Você só pode excluir as suas próprias vendas.','error'); return; }
   if(!confirm('Excluir esta venda?')) return;
   const {error} = await sb.from('vendas').delete().eq('id',id);
   if(error){ showToast('Erro ao excluir.','error'); return; }
@@ -1220,7 +1230,7 @@ function renderVendasTable(){
   const tbody = document.querySelector('#tabelaVendas tbody');
   if(!lista.length){ tbody.innerHTML = '<tr><td colspan="10" class="empty">Nenhuma venda encontrada.</td></tr>'; return; }
   tbody.innerHTML = lista.map(v=>`
-    <tr style="cursor:pointer" onclick='openVendaModal(${JSON.stringify(v).replace(/'/g,"&apos;")})'>
+    <tr ${podeEditarVenda(v)?`style="cursor:pointer" onclick='openVendaModal(${JSON.stringify(v).replace(/'/g,"&apos;")})'`:''}>
       <td>${(v.data||'').split('-').reverse().join('/')}</td>
       <td>${v.cliente||''}</td>
       <td>${v.vendedor||''}</td>
@@ -1230,7 +1240,7 @@ function renderVendasTable(){
       <td>${fmtMoeda(v.comissao_bruta)}</td>
       <td><strong>${fmtMoeda(v.comissao_liquida)}</strong></td>
       <td>${v.origem||'—'}</td>
-      <td>✏️</td>
+      <td>${podeEditarVenda(v)?'✏️':''}</td>
     </tr>`).join('');
 }
 
@@ -1322,13 +1332,15 @@ function renderMetas(){
   if(!vendedoresConhecidos.length){ document.getElementById('metasCard').innerHTML='<div class="empty">Nenhum vendedor cadastrado ainda.</div>'; return; }
   document.getElementById('metasCard').innerHTML = vendedoresConhecidos.map(nome=>{
     const atual = metasDoMes[nome]?.meta_comissao || '';
+    const ehG = currentProfile?.role==='gestor';
     return `<div class="field" style="display:flex;align-items:center;gap:12px;max-width:420px">
       <label style="min-width:140px;margin:0">${nome}</label>
-      <input type="number" step="0.01" value="${atual}" data-vendedor="${nome}" onchange="salvarMeta(this)" placeholder="0,00">
+      <input type="number" step="0.01" value="${atual}" data-vendedor="${nome}" ${ehG?'onchange="salvarMeta(this)" placeholder="0,00"':'disabled placeholder="—"'}>
     </div>`;
   }).join('');
 }
 async function salvarMeta(el){
+  if(currentProfile?.role!=='gestor') return;
   const vendedor = el.dataset.vendedor;
   const mes = document.getElementById('metaMes').value || mesAtualStr();
   const meta_comissao = parseFloat(el.value)||0;
