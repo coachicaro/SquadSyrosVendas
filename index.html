@@ -1050,7 +1050,7 @@ function funilVerticalHTML(tot){
   const etapas = LEAD_ETAPAS.map(([nome,k])=>({nome, v:+tot[k]||0}));
   const cores = ['#2A3568','#3B4A8C','#4A5899','#2DB863','#1A6B3A'];
   const compacto = window.innerWidth < 640;
-  const W = compacto?360:680, cx = compacto?180:235, maxW = compacto?340:440, minW = compacto?150:140, H = compacto?70:78, gap = compacto?36:4, top = 8;
+  const W = compacto?360:680, cx = compacto?180:235, maxW = compacto?340:440, minW = compacto?150:140, H = compacto?70:78, gap = compacto?36:8, top = 8;
   const base = etapas[0].v;
   const larg = v => minW + (maxW-minW)*(base>0 ? v/base : 0);
   // maior vazamento (menor passagem entre etapas)
@@ -1061,11 +1061,12 @@ function funilVerticalHTML(tot){
     const y = top + i*(H+gap);
     const wt = larg(e.v);
     const wb = i<etapas.length-1 ? larg(etapas[i+1].v) : wt*0.72;
-    const pts = `${cx-wt/2},${y} ${cx+wt/2},${y} ${cx+wb/2},${y+H} ${cx-wb/2},${y+H}`;
+    const r = 11; // raio dos cantos (polígono encolhido + traço grosso arredondado)
+    const pts = `${cx-(wt-2*r)/2},${y+r} ${cx+(wt-2*r)/2},${y+r} ${cx+(wb-2*r)/2},${y+H-r} ${cx-(wb-2*r)/2},${y+H-r}`;
     const pctTotal = base>0 ? (e.v/base*100) : 0;
     const prev = i>0 ? etapas[i-1] : null;
     const conv = prev && prev.v>0 ? (e.v/prev.v*100) : null;
-    svg += `<polygon points="${pts}" fill="${cores[i]}" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+    svg += `<polygon points="${pts}" fill="${cores[i]}" stroke="${cores[i]}" stroke-width="${2*r}" stroke-linejoin="round"/>
       <text x="${cx}" y="${y+H/2-4}" text-anchor="middle" font-size="12.5" font-weight="500" fill="#fff" opacity=".92">${e.nome}</text>
       <text x="${cx}" y="${y+H/2+20}" text-anchor="middle" font-size="24" font-weight="600" fill="#fff" font-family="'DM Serif Display',serif">${e.v}</text>`;
     if(compacto){
