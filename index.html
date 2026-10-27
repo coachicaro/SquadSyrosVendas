@@ -533,7 +533,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     </div>
     <div class="field"><label>Valor mensal total (R$)</label><input type="number" step="0.01" id="cValorDepois" oninput="atualizarPreviewCase()"></div>
     <div class="hint" id="cPreview" style="margin-bottom:12px"></div>
-    <div class="field"><label id="cObsLabel">Detalhe para a história (opcional)</label><textarea id="cObs" rows="2" placeholder="Ex.: passou a ter acesso ao hospital X sem carência"></textarea></div>
+    <div class="field"><label id="cObsLabel">Motivo ou ganho para a história (opcional)</label><textarea id="cObs" rows="2" placeholder="Só o motivo ou o ganho. Operadoras e valores o sistema já coloca. Ex.: queria acesso ao hospital X para os filhos pequenos"></textarea></div>
     <datalist id="listaOperadorasAntes"><option value="Amil"><option value="Bradesco Saúde"><option value="SulAmérica"><option value="Unimed"><option value="Hapvida"><option value="Porto Saúde"><option value="MedSênior"><option value="DoctorClin"></datalist>
     <div class="hint" id="cAviso" style="margin-bottom:10px"></div>
     <div class="modal-actions">
@@ -1335,34 +1335,37 @@ function perfilTxtCase(c){
   return n>1 ? `um cliente com ${n} vidas` : 'um cliente';
 }
 function planoTxtCase(op, plano){ return `${plano?'o plano '+plano:'um plano'}${op?' da '+op:''}`; }
-function historiaCase(c){
+const cap1 = s => s.charAt(0).toUpperCase()+s.slice(1);
+function historiaCase(c, multi){
   const quem = perfilTxtCase(c) + (c.cidade ? ` de ${c.cidade}` : '');
+  // com vários cases a abertura "Olha o caso de" não se repete: cada item começa direto pelo perfil
+  const head = multi ? `${cap1(quem)}:` : `Olha o caso de ${quem}:`;
   const opD = OPERADORA_LABEL[c.operadora_depois]||c.operadora_depois||'';
   const depois = planoTxtCase(opD, c.plano_depois);
   const antes = planoTxtCase(c.operadora_antes, c.plano_antes);
   const e = economiaCase(c); const obs = (c.observacao||'').trim();
   let t;
   if(c.tipo==='primeira_contratacao'){
-    t = `Olha o caso de ${quem}: nunca tinha tido plano de saúde e hoje conta com ${depois}, por ${moedaCurta(c.valor_depois)}/mês.`;
+    t = `${head} nunca tinha tido plano de saúde e hoje conta com ${depois}, por ${moedaCurta(c.valor_depois)}/mês.`;
   } else if(c.tipo==='melhora_cobertura'){
-    t = `Olha o caso de ${quem}: tinha ${antes}${c.valor_antes>0?` e pagava ${moedaCurta(c.valor_antes)}/mês`:''}. Migrou para ${depois}${c.valor_depois>0?` (${moedaCurta(c.valor_depois)}/mês)`:''} e ganhou uma cobertura melhor`;
+    t = `${head} tinha ${antes}${c.valor_antes>0?` e pagava ${moedaCurta(c.valor_antes)}/mês`:''}. Migrou para ${depois}${c.valor_depois>0?` (${moedaCurta(c.valor_depois)}/mês)`:''} e ganhou uma cobertura melhor`;
     if(e) t += e.mensal>0 ? `, pagando ${moedaCurta(e.mensal)} a menos por mês.` : (e.mensal<0 ? `, com uma diferença de ${moedaCurta(-e.mensal)} por mês pela melhora.` : ', sem aumentar o valor.');
     else t += '.';
   } else if(c.tipo==='mudanca_operadora'){
-    t = `Olha o caso de ${quem}: estava ${c.operadora_antes?'na '+c.operadora_antes:'em outra operadora'}${c.plano_antes?' com o plano '+c.plano_antes:''}${c.valor_antes>0?`, pagando ${moedaCurta(c.valor_antes)}/mês`:''}. Fez a troca para ${depois} e hoje paga ${moedaCurta(c.valor_depois)}/mês`;
-    t += (e && e.anual>0) ? `, uma economia de ${moedaCurta(e.anual)} por ano (${e.pct.toFixed(0)}% a menos).` : '.';
+    t = `${head} saiu ${c.operadora_antes?'da '+c.operadora_antes:'de outra operadora'}${c.plano_antes?` (plano ${c.plano_antes})`:''}${c.valor_antes>0?`, onde pagava ${moedaCurta(c.valor_antes)}/mês,`:''} e foi para ${depois}, pagando hoje ${moedaCurta(c.valor_depois)}/mês`;
+    t += (e && e.anual>0) ? ` — uma economia de ${moedaCurta(e.anual)} por ano (${e.pct.toFixed(0)}% a menos).` : '.';
   } else {
-    t = `Olha o caso de ${quem}: tinha ${antes}${c.valor_antes>0?` e pagava ${moedaCurta(c.valor_antes)}/mês`:''}. Hoje está com ${depois}, pagando ${moedaCurta(c.valor_depois)}/mês`;
+    t = `${head} tinha ${antes}${c.valor_antes>0?` e pagava ${moedaCurta(c.valor_antes)}/mês`:''}. Hoje está com ${depois}, pagando ${moedaCurta(c.valor_depois)}/mês`;
     t += (e && e.anual>0) ? ` — uma economia de ${moedaCurta(e.anual)} por ano (${e.pct.toFixed(0)}% a menos).` : '.';
   }
-  if(obs){ const o = obs.charAt(0).toUpperCase()+obs.slice(1); t += ' ' + o + (/[.!?]$/.test(o)?'':'.'); }
+  if(obs){ const o = cap1(obs); t += ' ' + o + (/[.!?]$/.test(o)?'':'.'); }
   return t;
 }
 function mensagemCases(ids){
   const cs = ids.map(id=>todosCases.find(c=>c.id===id)).filter(Boolean);
   if(!cs.length) return '';
-  if(cs.length===1) return historiaCase(cs[0]);
-  return 'Separei alguns casos reais de clientes nossos:\n\n' + cs.map((c,i)=>`${i+1}) ${historiaCase(c)}`).join('\n\n');
+  if(cs.length===1) return historiaCase(cs[0], false);
+  return 'Separei alguns casos reais de clientes nossos:\n\n' + cs.map((c,i)=>`${i+1}) ${historiaCase(c, true)}`).join('\n\n');
 }
 function atualizarStoryCases(){
   const box = document.getElementById('casesStory'); const n = casesSel.size;
@@ -1380,7 +1383,7 @@ async function copiarMensagemCases(){
 function aoMudarTipoCase(){
   const t = document.getElementById('cTipo').value;
   document.getElementById('cAntesWrap').style.display = t==='primeira_contratacao' ? 'none' : '';
-  document.getElementById('cObsLabel').textContent = t==='melhora_cobertura' ? 'O que melhorou na cobertura (vai na história)' : 'Detalhe para a história (opcional)';
+  document.getElementById('cObsLabel').textContent = t==='melhora_cobertura' ? 'O que melhorou na cobertura (vai na história)' : 'Motivo ou ganho para a história (opcional)';
   atualizarPreviewCase();
 }
 function atualizarPreviewCase(){
