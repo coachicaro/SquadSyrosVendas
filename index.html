@@ -1023,26 +1023,10 @@ function renderLeads(){
     <div class="card stat-card"><div class="label">Qualificação</div><div class="value">${pctTxt(tot.qualificados,tot.leads_gerados)}</div><div class="delta" style="color:var(--text-2)">dos leads são qualificados</div></div>
     <div class="card stat-card"><div class="label">${mensal?'Meses no período':'Semanas lançadas'}</div><div class="value">${nUn}</div>${mensal?`<div class="delta" style="color:var(--text-2)">${nSem} semana${nSem===1?'':'s'} lançada${nSem===1?'':'s'}</div>`:''}</div>`;
 
-  // funil
-  if(!nSem || !tot.leads_gerados){
-    document.getElementById('leadsFunil').innerHTML = '<div class="empty">Lance os números da primeira semana para ver o funil.</div>';
-  } else {
-    let pior = null;
-    const partes = LEAD_ETAPAS.map(([nome,k],i)=>{
-      const v = tot[k]; const pct = v/tot.leads_gerados*100;
-      let conv = '';
-      if(i>0){
-        const ant = tot[LEAD_ETAPAS[i-1][1]];
-        const taxa = ant>0 ? v/ant : null;
-        if(taxa!==null && (pior===null || taxa<pior.taxa)) pior = {taxa, de:LEAD_ETAPAS[i-1][0], para:nome};
-        conv = `<div class="funnel-conv">↓ ${pctTxt(v,ant)} passam de ${LEAD_ETAPAS[i-1][0].toLowerCase()} para ${nome.toLowerCase()}</div>`;
-      }
-      const cores = ['#2A3568','#3B4A8C','#4A5899','#2DB863','#1A6B3A'];
-      return conv + `<div class="funnel-step"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="font-weight:500">${nome}</span><span style="color:var(--text-2)">${v}</span></div>
-        <div style="height:24px;background:var(--bg);border-radius:6px;overflow:hidden"><div style="height:100%;width:${Math.max(pct,v>0?3:0)}%;background:${cores[i]};border-radius:6px"></div></div></div>`;
-    }).join('');
-    document.getElementById('leadsFunil').innerHTML = partes + (pior?`<div class="hint" style="margin-top:12px;color:#8A5A0B"><strong>Maior vazamento:</strong> ${pior.de} → ${pior.para} (${(pior.taxa*100).toFixed(0)}%). É onde mais se perde.</div>`:'');
-  }
+  // funil visual (vertical)
+  document.getElementById('leadsFunil').innerHTML = (!nSem || !tot.leads_gerados)
+    ? '<div class="empty">Lance os números da primeira semana para ver o funil.</div>'
+    : funilVerticalHTML(tot);
 
   // tabela mensal
   document.getElementById('wrapLeadsSem').style.display = mensal ? 'none' : '';
@@ -1061,6 +1045,59 @@ function renderLeads(){
     <td>${pctTxt(s.fechamentos,s.leads_gerados)}</td>
     <td>${ehGestor?`<button class="btn btn-danger" style="padding:4px 9px;font-size:11.5px" onclick="event.stopPropagation();excluirSemanaLeads('${s.id}')">Excluir</button>`:''}</td></tr>`).join('')
     : '<tr><td colspan="8" class="empty">Nenhuma semana lançada ainda.</td></tr>';
+}
+function funilVerticalHTML(tot){
+  const etapas = LEAD_ETAPAS.map(([nome,k])=>({nome, v:+tot[k]||0}));
+  const cores = ['#2A3568','#3B4A8C','#4A5899','#2DB863','#1A6B3A'];
+  const compacto = window.innerWidth < 640;
+  const W = compacto?360:680, cx = compacto?180:235, maxW = compacto?340:440, minW = compacto?150:140, H = compacto?70:78, gap = compacto?36:4, top = 8;
+  const base = etapas[0].v;
+  const larg = v => minW + (maxW-minW)*(base>0 ? v/base : 0);
+  // maior vazamento (menor passagem entre etapas)
+  let pior = -1, piorTaxa = 2;
+  etapas.forEach((e,i)=>{ if(i>0 && etapas[i-1].v>0){ const t=e.v/etapas[i-1].v; if(t<piorTaxa){ piorTaxa=t; pior=i; } } });
+  let svg = '';
+  etapas.forEach((e,i)=>{
+    const y = top + i*(H+gap);
+    const wt = larg(e.v);
+    const wb = i<etapas.length-1 ? larg(etapas[i+1].v) : wt*0.72;
+    const pts = `${cx-wt/2},${y} ${cx+wt/2},${y} ${cx+wb/2},${y+H} ${cx-wb/2},${y+H}`;
+    const pctTotal = base>0 ? (e.v/base*100) : 0;
+    const prev = i>0 ? etapas[i-1] : null;
+    const conv = prev && prev.v>0 ? (e.v/prev.v*100) : null;
+    svg += `<polygon points="${pts}" fill="${cores[i]}" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+      <text x="${cx}" y="${y+H/2-4}" text-anchor="middle" font-size="12.5" font-weight="500" fill="#fff" opacity=".92">${e.nome}</text>
+      <text x="${cx}" y="${y+H/2+20}" text-anchor="middle" font-size="24" font-weight="600" fill="#fff" font-family="'DM Serif Display',serif">${e.v}</text>`;
+    if(compacto){
+      if(i>0){
+        const ruim = i===pior; const cor = ruim ? '#C77D0A' : '#1A6B3A';
+        svg += `<text x="${cx}" y="${y-gap/2+5}" text-anchor="middle" font-size="12.5" fill="#5C5850"><tspan font-weight="600" fill="${cor}">↓ ${conv===null?'—':conv.toFixed(0)+'%'}</tspan> avançam · ${pctTotal.toFixed(1).replace('.',',')}% do total</text>`;
+      }
+      return;
+    }
+    // anotação à direita
+    const ax = cx+maxW/2+34, ay = y+H/2;
+    svg += `<line x1="${cx+Math.max(wt,wb)/2+6}" y1="${ay}" x2="${ax-8}" y2="${ay}" stroke="#DDE0EC" stroke-dasharray="3 4"/>`;
+    if(i===0){
+      svg += `<text x="${ax}" y="${ay-2}" font-size="22" font-weight="600" fill="#2A3568" font-family="'DM Serif Display',serif">100%</text>
+        <text x="${ax}" y="${ay+16}" font-size="11.5" fill="#5C5850">dos leads recebidos</text>`;
+    } else {
+      const ruim = i===pior;
+      const cor = ruim ? '#C77D0A' : '#1A6B3A';
+      svg += `<text x="${ax}" y="${ay-2}" font-size="22" font-weight="600" fill="${cor}" font-family="'DM Serif Display',serif">${conv===null?'—':conv.toFixed(0)+'%'}</text>
+        <text x="${ax}" y="${ay+15}" font-size="11.5" fill="#5C5850">avançam de ${etapas[i-1].nome.toLowerCase()}</text>
+        <text x="${ax}" y="${ay+30}" font-size="11" fill="#9C9890">${pctTotal.toFixed(1).replace('.',',')}% do total de leads</text>`;
+    }
+  });
+  const totalH = top + etapas.length*(H+gap);
+  const geral = base>0 ? (etapas[etapas.length-1].v/base*100) : 0;
+  const ult = etapas[etapas.length-1];
+  const cab = `<svg viewBox="0 0 ${W} ${totalH}" style="width:100%;height:auto;max-width:${W}px;display:block;margin:0 auto;font-family:'DM Sans',sans-serif" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  const resumo = `<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px;padding:16px 18px;border-radius:10px;background:#FFF7E6;border:1px solid #F3D9A4">
+      <div style="font-family:'DM Serif Display',serif;font-size:34px;color:#2A3568;line-height:1">${geral.toFixed(1).replace('.',',')}%</div>
+      <div style="flex:1;min-width:200px"><div style="font-weight:600;font-size:14px;color:#2A3568">Aproveitamento geral do funil</div>
+      <div style="font-size:12.5px;color:#5C5850;margin-top:2px">De ${base} lead${base===1?'':'s'} recebido${base===1?'':'s'}, ${ult.v} ${ult.v===1?'chegou':'chegaram'} ao fechamento.${pior>0?` Maior vazamento: ${etapas[pior-1].nome.toLowerCase()} → ${etapas[pior].nome.toLowerCase()} (${(piorTaxa*100).toFixed(0)}% avançam).`:''}</div></div></div>`;
+  return cab + resumo;
 }
 function setFormSemana(s){
   document.getElementById('lfLeads').value = s?.leads_gerados ?? '';
