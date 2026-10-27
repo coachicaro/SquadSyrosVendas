@@ -1254,7 +1254,8 @@ function barChart(data, colorFn){
 const TIPOS_CASE = {
   reducao_custo:        { label:'Redução de custo',      cor:'#1A6B3A', bg:'#E7F6EC' },
   melhora_cobertura:    { label:'Melhora de cobertura',  cor:'#2A3568', bg:'#E9ECF7' },
-  primeira_contratacao: { label:'Primeira contratação',  cor:'#8A5A0B', bg:'#FFF3DB' }
+  primeira_contratacao: { label:'Primeira contratação',  cor:'#8A5A0B', bg:'#FFF3DB' },
+  mudanca_operadora:    { label:'Mudança de operadora',  cor:'#0F6C7A', bg:'#E3F4F6' }
 };
 const PERFIS_CASE = { familia:'Família', casal:'Casal', individual:'Individual', empresa:'Empresa' };
 function moedaCurta(v){ v = +v||0; const int = Math.abs(v-Math.round(v))<0.005; return 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:int?0:2,maximumFractionDigits:int?0:2}); }
@@ -1302,6 +1303,9 @@ function renderCases(){
       ? `<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:#E7F6EC"><div style="font-family:'DM Serif Display',serif;font-size:22px;color:#1A6B3A;line-height:1.1">${fmtMoeda(e.anual)} <span style="font-family:'DM Sans',sans-serif;font-size:12px;color:#1A6B3A">de economia por ano</span></div><div style="font-size:11.5px;color:var(--text-2);margin-top:2px">${fmtMoeda(e.mensal)} por mês · ${e.pct.toFixed(0)}% a menos</div></div>`
       : `<div style="margin-top:12px;font-size:12px;color:var(--text-3)">Sem economia neste case (valor atual maior que o anterior).</div>`;
     else if(c.tipo==='melhora_cobertura' && e) destaque = `<div style="margin-top:12px;font-size:12.5px;color:var(--text-2)">${e.mensal>0?`Pagando ${fmtMoeda(e.mensal)}/mês a menos com cobertura melhor`:(e.mensal<0?`Diferença de ${fmtMoeda(-e.mensal)}/mês pela cobertura melhor`:'Mesmo valor de antes, com cobertura melhor')}</div>`;
+    else if(c.tipo==='mudanca_operadora') destaque = (e && e.anual>0)
+      ? `<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:#E3F4F6"><div style="font-family:'DM Serif Display',serif;font-size:22px;color:#0F6C7A;line-height:1.1">${fmtMoeda(e.anual)} <span style="font-family:'DM Sans',sans-serif;font-size:12px">de economia por ano</span></div><div style="font-size:11.5px;color:var(--text-2);margin-top:2px">${fmtMoeda(e.mensal)} por mês · ${e.pct.toFixed(0)}% a menos</div></div>`
+      : `<div style="margin-top:12px;font-size:12.5px;color:var(--text-2)">Trocou de ${escHtml(c.operadora_antes||'operadora')} para ${escHtml(OPERADORA_LABEL[c.operadora_depois]||c.operadora_depois||'')}${e && e.mensal<0?` (diferença de ${fmtMoeda(-e.mensal)}/mês)`:''}</div>`;
     else if(c.tipo==='primeira_contratacao') destaque = `<div style="margin-top:12px;font-size:12.5px;color:var(--text-2)">Primeiro plano de saúde do cliente</div>`;
     const obs = c.observacao ? `<div style="margin-top:8px;font-size:12px;color:var(--text-2)">${escHtml(c.observacao)}</div>` : '';
     const pend = !c.aprovado ? `<span class="badge" style="background:#FFF3DB;color:#8A5A0B">Aguardando aprovação</span>` : '';
@@ -1344,6 +1348,9 @@ function historiaCase(c){
     t = `Olha o caso de ${quem}: tinha ${antes}${c.valor_antes>0?` e pagava ${moedaCurta(c.valor_antes)}/mês`:''}. Migrou para ${depois}${c.valor_depois>0?` (${moedaCurta(c.valor_depois)}/mês)`:''} e ganhou uma cobertura melhor`;
     if(e) t += e.mensal>0 ? `, pagando ${moedaCurta(e.mensal)} a menos por mês.` : (e.mensal<0 ? `, com uma diferença de ${moedaCurta(-e.mensal)} por mês pela melhora.` : ', sem aumentar o valor.');
     else t += '.';
+  } else if(c.tipo==='mudanca_operadora'){
+    t = `Olha o caso de ${quem}: estava ${c.operadora_antes?'na '+c.operadora_antes:'em outra operadora'}${c.plano_antes?' com o plano '+c.plano_antes:''}${c.valor_antes>0?`, pagando ${moedaCurta(c.valor_antes)}/mês`:''}. Fez a troca para ${depois} e hoje paga ${moedaCurta(c.valor_depois)}/mês`;
+    t += (e && e.anual>0) ? `, uma economia de ${moedaCurta(e.anual)} por ano (${e.pct.toFixed(0)}% a menos).` : '.';
   } else {
     t = `Olha o caso de ${quem}: tinha ${antes}${c.valor_antes>0?` e pagava ${moedaCurta(c.valor_antes)}/mês`:''}. Hoje está com ${depois}, pagando ${moedaCurta(c.valor_depois)}/mês`;
     t += (e && e.anual>0) ? ` — uma economia de ${moedaCurta(e.anual)} por ano (${e.pct.toFixed(0)}% a menos).` : '.';
@@ -1412,6 +1419,7 @@ async function salvarCase(){
   const tipo = v('cTipo'); const num = x => { const n = parseFloat(document.getElementById(x).value); return isNaN(n)?null:n; };
   if(!v('cCliente')){ showToast('Informe o cliente.','error'); return; }
   if(num('cValorDepois')===null || num('cValorDepois')<0){ showToast('Informe o valor mensal atual.','error'); return; }
+  if(tipo==='mudanca_operadora' && !v('cOpAntes')){ showToast('Informe a operadora de antes.','error'); return; }
   if(tipo==='reducao_custo' && !(num('cValorAntes')>0)){ showToast('Informe o valor mensal de antes para calcular a economia.','error'); return; }
   const row = {
     cliente:v('cCliente'), tipo, perfil:v('cPerfil')||null, vidas:parseInt(v('cVidas'))||null, cidade:v('cCidade')||null,
