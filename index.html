@@ -222,6 +222,7 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <div class="nav-item" data-view="origem" onclick="showView('origem')">🔗 Origem</div>
     <div class="nav-item" id="navFinanceiro" data-view="financeiro" onclick="showView('financeiro')" style="display:none">🏦 Financeiro</div>
     <div class="nav-item" id="navLeads" data-view="leads" onclick="showView('leads')">🧲 Funil</div>
+    <div class="nav-item" id="navCases" data-view="cases" onclick="showView('cases')">⭐ Cases</div>
     <div class="nav-item" id="navExportar" data-view="exportar" onclick="showView('exportar')" style="display:none">📤 Exportar</div>
     <div class="sidebar-footer">
       <div class="who" id="whoAmI">—</div>
@@ -378,6 +379,30 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
       </div>
     </div>
 
+    <!-- CASES -->
+    <div id="view-cases" style="display:none">
+      <h1 class="page-title">Cases de clientes</h1>
+      <div class="page-sub">Casos de sucesso prontos para usar na negociação — selecione e copie a história</div>
+      <div class="row" style="flex-wrap:wrap">
+        <button class="btn btn-primary" style="width:auto" onclick="openCaseModal()">+ Novo case</button>
+        <select id="casesTipo" onchange="renderCases()"></select>
+        <select id="casesStatus" onchange="renderCases()" style="display:none"><option value="">Todos os cases</option><option value="aprovado">Disponíveis para o time</option><option value="pendente">Aguardando aprovação</option></select>
+      </div>
+      <div class="hint" id="casesHint" style="margin:0 0 14px"></div>
+      <div id="casesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:16px"></div>
+      <div class="card" id="casesStory" style="display:none;position:sticky;bottom:12px;border-color:#BFC6E6;box-shadow:var(--shadow-lg)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <h3 id="casesStoryTitulo" style="margin:0">Mensagem pronta</h3>
+          <div class="row" style="margin:0">
+            <button class="btn" onclick="limparSelecaoCases()">Limpar seleção</button>
+            <button class="btn btn-primary" style="width:auto" onclick="copiarMensagemCases()">📋 Copiar mensagem</button>
+          </div>
+        </div>
+        <textarea id="casesStoryTxt" rows="6" style="width:100%"></textarea>
+        <div class="hint" style="margin:6px 0 0">O nome do cliente nunca entra na mensagem. Você pode ajustar o texto antes de copiar.</div>
+      </div>
+    </div>
+
     <!-- PROPOSTAS -->
     <div id="view-propostas" style="display:none">
       <h1 class="page-title">Propostas</h1>
@@ -479,6 +504,43 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
       </div>
     </div>
   </main>
+</div>
+
+<!-- MODAL CASE -->
+<div class="modal-overlay" id="modalCase">
+  <div class="modal" style="width:520px">
+    <h2 id="modalCaseTitle">Novo case</h2>
+    <input type="hidden" id="cId">
+    <div class="field"><label>Cliente (uso interno — não vai na mensagem)</label><input type="text" id="cCliente"></div>
+    <div class="field"><label>Tipo de sucesso</label><select id="cTipo" onchange="aoMudarTipoCase()"></select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="field"><label>Perfil</label><select id="cPerfil"><option value="">—</option><option value="familia">Família</option><option value="casal">Casal</option><option value="individual">Individual</option><option value="empresa">Empresa</option></select></div>
+      <div class="field"><label>Nº de vidas</label><input type="number" min="1" id="cVidas"></div>
+    </div>
+    <div class="field"><label>Cidade ou região</label><input type="text" id="cCidade" placeholder="Ex.: Santa Maria"></div>
+    <div id="cAntesWrap">
+      <div style="font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin:6px 0 8px">Antes</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Operadora</label><input type="text" id="cOpAntes" list="listaOperadorasAntes" placeholder="Ex.: Unimed"></div>
+        <div class="field"><label>Plano</label><input type="text" id="cPlanoAntes" placeholder="Opcional"></div>
+      </div>
+      <div class="field"><label>Valor mensal total (R$)</label><input type="number" step="0.01" id="cValorAntes" oninput="atualizarPreviewCase()"></div>
+    </div>
+    <div style="font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin:6px 0 8px">Agora</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="field"><label>Operadora</label><select id="cOpDepois"></select></div>
+      <div class="field"><label>Plano</label><input type="text" id="cPlanoDepois" placeholder="Opcional"></div>
+    </div>
+    <div class="field"><label>Valor mensal total (R$)</label><input type="number" step="0.01" id="cValorDepois" oninput="atualizarPreviewCase()"></div>
+    <div class="hint" id="cPreview" style="margin-bottom:12px"></div>
+    <div class="field"><label id="cObsLabel">Detalhe para a história (opcional)</label><textarea id="cObs" rows="2" placeholder="Ex.: passou a ter acesso ao hospital X sem carência"></textarea></div>
+    <datalist id="listaOperadorasAntes"><option value="Amil"><option value="Bradesco Saúde"><option value="SulAmérica"><option value="Unimed"><option value="Hapvida"><option value="Porto Saúde"><option value="MedSênior"><option value="DoctorClin"></datalist>
+    <div class="hint" id="cAviso" style="margin-bottom:10px"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modalCase')">Cancelar</button>
+      <button class="btn btn-primary" style="width:auto" onclick="salvarCase()">Salvar</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL VENDA -->
@@ -628,7 +690,7 @@ function diffDias(a,b){ return Math.round((new Date(a+'T00:00:00')-new Date(b+'T
 const OPERADORA_LABEL = { DoctorClin:'DoctorClin', MedSenior:'MedSênior', Amil:'Amil', Bradesco:'Bradesco', SulAmerica:'SulAmérica' };
 
 let currentProfile = null;
-let todasVendas = [], todasMetas = [], todasPropostas = [], todosRecebimentos = [], todasCampanhas = [], todoFunilSemanal = [];
+let todasVendas = [], todasMetas = [], todasPropostas = [], todosRecebimentos = [], todasCampanhas = [], todoFunilSemanal = [], todosCases = [], casesSel = new Set();
 let vendedoresConhecidos = [], vendedoresInativos = new Set();
 
 function calcComissao(parcela, operadora){
@@ -725,6 +787,10 @@ async function carregarTudo(){
     const {data:fs} = await sb.from('funil_semanal').select('*').order('semana_inicio',{ascending:false});
     todoFunilSemanal = fs||[];
   }
+  {
+    const {data:cs} = await sb.from('cases').select('*').order('created_at',{ascending:false});
+    todosCases = cs||[];
+  }
 }
 
 function popularSelectsMes(){
@@ -772,6 +838,7 @@ function showView(view){
   if(view==='origem') renderOrigem();
   if(view==='financeiro') renderFinanceiro();
   if(view==='leads') renderLeads();
+  if(view==='cases') renderCases();
 }
 
 function vendasDoMes(mes){ return todasVendas.filter(v=>(v.data||'').slice(0,7)===mes); }
@@ -1182,6 +1249,200 @@ function barChart(data, colorFn){
       </div>
     </div>`).join('');
 }
+
+/* ===== CASES DE CLIENTES ===== */
+const TIPOS_CASE = {
+  reducao_custo:        { label:'Redução de custo',      cor:'#1A6B3A', bg:'#E7F6EC' },
+  melhora_cobertura:    { label:'Melhora de cobertura',  cor:'#2A3568', bg:'#E9ECF7' },
+  primeira_contratacao: { label:'Primeira contratação',  cor:'#8A5A0B', bg:'#FFF3DB' }
+};
+const PERFIS_CASE = { familia:'Família', casal:'Casal', individual:'Individual', empresa:'Empresa' };
+function moedaCurta(v){ v = +v||0; const int = Math.abs(v-Math.round(v))<0.005; return 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:int?0:2,maximumFractionDigits:int?0:2}); }
+function economiaCase(c){
+  if(!(+c.valor_antes>0) || c.valor_depois==null) return null;
+  const mensal = (+c.valor_antes) - (+c.valor_depois);
+  return { mensal, anual: mensal*12, pct: mensal/(+c.valor_antes)*100 };
+}
+function popularSelectsCase(){
+  const t = document.getElementById('casesTipo');
+  if(!t.options.length) t.innerHTML = '<option value="">Todos os tipos</option>' + Object.entries(TIPOS_CASE).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  const ct = document.getElementById('cTipo');
+  if(!ct.options.length) ct.innerHTML = Object.entries(TIPOS_CASE).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  const od = document.getElementById('cOpDepois');
+  if(!od.options.length) od.innerHTML = Object.entries(OPERADORA_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+}
+function renderCases(){
+  popularSelectsCase();
+  const gestor = ehGestor();
+  document.getElementById('casesStatus').style.display = gestor ? '' : 'none';
+  document.getElementById('casesHint').textContent = gestor
+    ? 'Os cases cadastrados pelo time ficam “aguardando aprovação” até você liberar. Só os liberados aparecem para os vendedores.'
+    : 'Seus cases ficam “aguardando aprovação” até o gestor liberar para o time. Marque os cases liberados para montar a mensagem.';
+  const tipo = document.getElementById('casesTipo').value;
+  const st = gestor ? document.getElementById('casesStatus').value : '';
+  const lista = todosCases.filter(c=>(!tipo||c.tipo===tipo) && (!st || (st==='aprovado')===!!c.aprovado));
+  // limpa seleção de cases que sumiram
+  casesSel.forEach(id=>{ if(!todosCases.find(c=>c.id===id && c.aprovado)) casesSel.delete(id); });
+  const grid = document.getElementById('casesGrid');
+  if(!lista.length){ grid.innerHTML = '<div class="card empty" style="grid-column:1/-1">'+(todosCases.length?'Nenhum case neste filtro.':'Nenhum case cadastrado ainda. Clique em “+ Novo case”.')+'</div>'; atualizarStoryCases(); return; }
+  grid.innerHTML = lista.map(c=>{
+    const T = TIPOS_CASE[c.tipo]||TIPOS_CASE.reducao_custo; const e = economiaCase(c);
+    const sel = casesSel.has(c.id);
+    const meta = [PERFIS_CASE[c.perfil], c.vidas?`${c.vidas} vida${c.vidas==1?'':'s'}`:null, c.cidade].filter(Boolean).map(escHtml).join(' · ');
+    const antes = c.tipo!=='primeira_contratacao' && (c.operadora_antes||c.valor_antes>0) ? `
+      <div style="flex:1;min-width:0"><div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3)">Antes</div>
+        <div style="font-size:13px;font-weight:500">${escHtml(c.operadora_antes||'—')}</div>
+        <div style="font-size:12px;color:var(--text-2)">${c.plano_antes?escHtml(c.plano_antes)+' · ':''}${c.valor_antes>0?fmtMoeda(+c.valor_antes)+'/mês':''}</div></div>
+      <div style="align-self:center;color:var(--text-3)">→</div>` : '';
+    const depois = `<div style="flex:1;min-width:0"><div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3)">Agora</div>
+        <div style="font-size:13px;font-weight:500">${escHtml(OPERADORA_LABEL[c.operadora_depois]||c.operadora_depois||'—')}</div>
+        <div style="font-size:12px;color:var(--text-2)">${c.plano_depois?escHtml(c.plano_depois)+' · ':''}${fmtMoeda(+c.valor_depois)}/mês</div></div>`;
+    let destaque = '';
+    if(c.tipo==='reducao_custo' && e) destaque = e.anual>0
+      ? `<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:#E7F6EC"><div style="font-family:'DM Serif Display',serif;font-size:22px;color:#1A6B3A;line-height:1.1">${fmtMoeda(e.anual)} <span style="font-family:'DM Sans',sans-serif;font-size:12px;color:#1A6B3A">de economia por ano</span></div><div style="font-size:11.5px;color:var(--text-2);margin-top:2px">${fmtMoeda(e.mensal)} por mês · ${e.pct.toFixed(0)}% a menos</div></div>`
+      : `<div style="margin-top:12px;font-size:12px;color:var(--text-3)">Sem economia neste case (valor atual maior que o anterior).</div>`;
+    else if(c.tipo==='melhora_cobertura' && e) destaque = `<div style="margin-top:12px;font-size:12.5px;color:var(--text-2)">${e.mensal>0?`Pagando ${fmtMoeda(e.mensal)}/mês a menos com cobertura melhor`:(e.mensal<0?`Diferença de ${fmtMoeda(-e.mensal)}/mês pela cobertura melhor`:'Mesmo valor de antes, com cobertura melhor')}</div>`;
+    else if(c.tipo==='primeira_contratacao') destaque = `<div style="margin-top:12px;font-size:12.5px;color:var(--text-2)">Primeiro plano de saúde do cliente</div>`;
+    const obs = c.observacao ? `<div style="margin-top:8px;font-size:12px;color:var(--text-2)">${escHtml(c.observacao)}</div>` : '';
+    const pend = !c.aprovado ? `<span class="badge" style="background:#FFF3DB;color:#8A5A0B">Aguardando aprovação</span>` : '';
+    const ger = ehGestor() ? `<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn" style="padding:5px 10px;font-size:12px" onclick="editarCase('${c.id}')">Editar</button>
+        <button class="btn" style="padding:5px 10px;font-size:12px" onclick="alternarAprovacaoCase('${c.id}')">${c.aprovado?'Retirar do time':'Liberar para o time'}</button>
+        <button class="btn btn-danger" style="padding:5px 10px;font-size:12px" onclick="excluirCase('${c.id}')">Excluir</button></div>` : '';
+    return `<div class="card" style="padding:16px;${sel?'border-color:#2A3568;box-shadow:0 0 0 2px #2A356833':''}${c.aprovado?'':'opacity:.9'}">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        ${c.aprovado?`<input type="checkbox" ${sel?'checked':''} onchange="alternarSelecaoCase('${c.id}')" style="margin-top:4px;width:18px;height:18px;accent-color:#2A3568;flex-shrink:0">`:'<span style="width:18px;flex-shrink:0"></span>'}
+        <div style="flex:1;min-width:0"><div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--text);line-height:1.2">${escHtml(c.cliente)}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${meta||'&nbsp;'}</div></div>
+      </div>
+      <div style="display:flex;gap:6px;margin:10px 0 12px;flex-wrap:wrap"><span class="badge" style="background:${T.bg};color:${T.cor}">${T.label}</span>${pend}</div>
+      <div style="display:flex;gap:10px">${antes}${depois}</div>${destaque}${obs}${ger}
+    </div>`;
+  }).join('');
+  atualizarStoryCases();
+}
+function alternarSelecaoCase(id){ if(casesSel.has(id)) casesSel.delete(id); else casesSel.add(id); renderCases(); }
+function limparSelecaoCases(){ casesSel.clear(); renderCases(); }
+function perfilTxtCase(c){
+  const n = +c.vidas||0;
+  if(c.perfil==='familia') return n>1 ? `uma família de ${n} pessoas` : 'uma família';
+  if(c.perfil==='casal') return 'um casal';
+  if(c.perfil==='empresa') return n>0 ? `uma empresa com ${n} vida${n==1?'':'s'}` : 'uma empresa';
+  return n>1 ? `um cliente com ${n} vidas` : 'um cliente';
+}
+function planoTxtCase(op, plano){ return `${plano?'o plano '+plano:'um plano'}${op?' da '+op:''}`; }
+function historiaCase(c){
+  const quem = perfilTxtCase(c) + (c.cidade ? ` de ${c.cidade}` : '');
+  const opD = OPERADORA_LABEL[c.operadora_depois]||c.operadora_depois||'';
+  const depois = planoTxtCase(opD, c.plano_depois);
+  const antes = planoTxtCase(c.operadora_antes, c.plano_antes);
+  const e = economiaCase(c); const obs = (c.observacao||'').trim();
+  let t;
+  if(c.tipo==='primeira_contratacao'){
+    t = `Olha o caso de ${quem}: nunca tinha tido plano de saúde e hoje conta com ${depois}, por ${moedaCurta(c.valor_depois)}/mês.`;
+  } else if(c.tipo==='melhora_cobertura'){
+    t = `Olha o caso de ${quem}: tinha ${antes}${c.valor_antes>0?` e pagava ${moedaCurta(c.valor_antes)}/mês`:''}. Migrou para ${depois}${c.valor_depois>0?` (${moedaCurta(c.valor_depois)}/mês)`:''} e ganhou uma cobertura melhor`;
+    if(e) t += e.mensal>0 ? `, pagando ${moedaCurta(e.mensal)} a menos por mês.` : (e.mensal<0 ? `, com uma diferença de ${moedaCurta(-e.mensal)} por mês pela melhora.` : ', sem aumentar o valor.');
+    else t += '.';
+  } else {
+    t = `Olha o caso de ${quem}: tinha ${antes}${c.valor_antes>0?` e pagava ${moedaCurta(c.valor_antes)}/mês`:''}. Hoje está com ${depois}, pagando ${moedaCurta(c.valor_depois)}/mês`;
+    t += (e && e.anual>0) ? ` — uma economia de ${moedaCurta(e.anual)} por ano (${e.pct.toFixed(0)}% a menos).` : '.';
+  }
+  if(obs){ const o = obs.charAt(0).toUpperCase()+obs.slice(1); t += ' ' + o + (/[.!?]$/.test(o)?'':'.'); }
+  return t;
+}
+function mensagemCases(ids){
+  const cs = ids.map(id=>todosCases.find(c=>c.id===id)).filter(Boolean);
+  if(!cs.length) return '';
+  if(cs.length===1) return historiaCase(cs[0]);
+  return 'Separei alguns casos reais de clientes nossos:\n\n' + cs.map((c,i)=>`${i+1}) ${historiaCase(c)}`).join('\n\n');
+}
+function atualizarStoryCases(){
+  const box = document.getElementById('casesStory'); const n = casesSel.size;
+  box.style.display = n ? '' : 'none';
+  if(!n) return;
+  document.getElementById('casesStoryTitulo').textContent = n===1 ? 'Mensagem pronta (1 case)' : `Mensagem pronta (${n} cases)`;
+  document.getElementById('casesStoryTxt').value = mensagemCases([...casesSel]);
+}
+async function copiarMensagemCases(){
+  const txt = document.getElementById('casesStoryTxt').value;
+  try{ await navigator.clipboard.writeText(txt); }
+  catch(e){ const ta = document.getElementById('casesStoryTxt'); ta.select(); document.execCommand('copy'); }
+  showToast('Mensagem copiada!');
+}
+function aoMudarTipoCase(){
+  const t = document.getElementById('cTipo').value;
+  document.getElementById('cAntesWrap').style.display = t==='primeira_contratacao' ? 'none' : '';
+  document.getElementById('cObsLabel').textContent = t==='melhora_cobertura' ? 'O que melhorou na cobertura (vai na história)' : 'Detalhe para a história (opcional)';
+  atualizarPreviewCase();
+}
+function atualizarPreviewCase(){
+  const tipo = document.getElementById('cTipo').value;
+  const a = parseFloat(document.getElementById('cValorAntes').value)||0, d = parseFloat(document.getElementById('cValorDepois').value)||0;
+  const el = document.getElementById('cPreview');
+  if(tipo==='primeira_contratacao' || !(a>0)){ el.innerHTML = ''; return; }
+  const m = a-d;
+  el.innerHTML = m>0 ? `Economia de <strong>${fmtMoeda(m)}/mês</strong> · <strong>${fmtMoeda(m*12)}/ano</strong> (${(m/a*100).toFixed(0)}% a menos)` : (m<0 ? `Valor atual <strong>${fmtMoeda(-m)}/mês</strong> acima do anterior` : 'Mesmo valor de antes');
+}
+function openCaseModal(c){
+  popularSelectsCase();
+  document.getElementById('modalCaseTitle').textContent = c ? 'Editar case' : 'Novo case';
+  document.getElementById('cId').value = c?.id||'';
+  document.getElementById('cCliente').value = c?.cliente||'';
+  document.getElementById('cTipo').value = c?.tipo||'reducao_custo';
+  document.getElementById('cPerfil').value = c?.perfil||'';
+  document.getElementById('cVidas').value = c?.vidas||'';
+  document.getElementById('cCidade').value = c?.cidade||'';
+  document.getElementById('cOpAntes').value = c?.operadora_antes||'';
+  document.getElementById('cPlanoAntes').value = c?.plano_antes||'';
+  document.getElementById('cValorAntes').value = c?.valor_antes ?? '';
+  document.getElementById('cOpDepois').value = c?.operadora_depois||'Amil';
+  document.getElementById('cPlanoDepois').value = c?.plano_depois||'';
+  document.getElementById('cValorDepois').value = c?.valor_depois ?? '';
+  document.getElementById('cObs').value = c?.observacao||'';
+  document.getElementById('cAviso').textContent = (!c && !ehGestor()) ? 'Depois de salvar, o case fica aguardando a aprovação do gestor para aparecer para o time.' : '';
+  aoMudarTipoCase();
+  document.getElementById('modalCase').classList.add('visible');
+}
+function editarCase(id){ if(!ehGestor()) return; const c = todosCases.find(x=>x.id===id); if(c) openCaseModal(c); }
+async function salvarCase(){
+  const id = document.getElementById('cId').value;
+  if(id && !ehGestor()) return;
+  const v = x => document.getElementById(x).value.trim();
+  const tipo = v('cTipo'); const num = x => { const n = parseFloat(document.getElementById(x).value); return isNaN(n)?null:n; };
+  if(!v('cCliente')){ showToast('Informe o cliente.','error'); return; }
+  if(num('cValorDepois')===null || num('cValorDepois')<0){ showToast('Informe o valor mensal atual.','error'); return; }
+  if(tipo==='reducao_custo' && !(num('cValorAntes')>0)){ showToast('Informe o valor mensal de antes para calcular a economia.','error'); return; }
+  const row = {
+    cliente:v('cCliente'), tipo, perfil:v('cPerfil')||null, vidas:parseInt(v('cVidas'))||null, cidade:v('cCidade')||null,
+    operadora_antes: tipo==='primeira_contratacao'?null:(v('cOpAntes')||null), plano_antes: tipo==='primeira_contratacao'?null:(v('cPlanoAntes')||null),
+    valor_antes: tipo==='primeira_contratacao'?null:num('cValorAntes'),
+    operadora_depois:v('cOpDepois'), plano_depois:v('cPlanoDepois')||null, valor_depois:num('cValorDepois'), observacao:v('cObs')||null
+  };
+  let error;
+  if(id){ ({error} = await sb.from('cases').update(row).eq('id',id)); }
+  else {
+    row.criado_por = currentProfile.id; row.criado_por_nome = currentProfile.vendedor || currentProfile.nome; row.aprovado = ehGestor();
+    ({error} = await sb.from('cases').insert(row));
+  }
+  if(error){ showToast('Erro ao salvar: '+error.message,'error'); return; }
+  showToast(id ? 'Case atualizado!' : (ehGestor() ? 'Case salvo e liberado para o time!' : 'Case enviado para aprovação do gestor.'));
+  closeModal('modalCase'); await carregarTudo(); renderCases();
+}
+async function alternarAprovacaoCase(id){
+  if(!ehGestor()) return; const c = todosCases.find(x=>x.id===id); if(!c) return;
+  const {error} = await sb.from('cases').update({aprovado:!c.aprovado}).eq('id',id);
+  if(error){ showToast('Erro: '+error.message,'error'); return; }
+  showToast(c.aprovado ? 'Case retirado do time.' : 'Case liberado para o time!');
+  await carregarTudo(); renderCases();
+}
+async function excluirCase(id){
+  if(!ehGestor()) return; if(!confirm('Excluir este case?')) return;
+  const {error} = await sb.from('cases').delete().eq('id',id);
+  if(error){ showToast('Erro ao excluir.','error'); return; }
+  casesSel.delete(id); await carregarTudo(); renderCases();
+}
+
 /* ===== ANÁLISES (gestor) ===== */
 const pad2 = n => String(n).padStart(2,'0');
 const dStr = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
