@@ -506,10 +506,17 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
       <div class="card" style="margin-bottom:16px"><h3 style="margin-bottom:14px">Funil do período</h3><div id="leadsFunil"></div></div>
       <div class="card" style="margin-bottom:16px" id="leadsForm">
         <h3 style="margin-bottom:4px">Lançar semana</h3>
-        <div class="hint" style="margin:0 0 14px">Informe os números do relatório da semana. Lançar a mesma semana de novo atualiza os valores.</div>
+        <div class="hint" style="margin:0 0 14px">Informe o período do relatório (data de início e data final) e os números. Lançar o mesmo período de novo atualiza os valores.</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px">
-          <div class="field" style="margin:0"><label>Semana (qualquer dia)</label><input type="date" id="lfSemana" onchange="aoMudarSemanaLeads()"></div>
+          <div class="field" style="margin:0;grid-column:1/-1"><label id="lfRotulo">Semana (dia X ao dia Y)</label>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <input type="date" id="lfInicio" onchange="aoMudarInicioLeads()" style="width:auto" aria-label="Data de início da semana">
+              <span style="font-size:12.5px;color:var(--text-2)">ao dia</span>
+              <input type="date" id="lfFim" onchange="aoMudarFimLeads()" style="width:auto" aria-label="Data final da semana">
+            </div></div>
           <div class="field" style="margin:0"><label>Leads gerados</label><input type="number" min="0" id="lfLeads"></div>
+          <div class="field" style="margin:0"><label>Atendimentos realizados</label><input type="number" min="0" id="lfAtend"></div>
+          <div class="field" style="margin:0"><label>Leads em qualificação</label><input type="number" min="0" id="lfEmQual"></div>
           <div class="field" style="margin:0"><label>Qualificados</label><input type="number" min="0" id="lfQual"></div>
           <div class="field" style="margin:0"><label>Agendados</label><input type="number" min="0" id="lfAgend"></div>
           <div class="field" style="margin:0"><label>Propostas</label><input type="number" min="0" id="lfProp"></div>
@@ -521,11 +528,11 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
         </div>
       </div>
       <div class="card" style="padding:0;overflow-x:auto" id="wrapLeadsSem">
-        <table id="tabelaLeads"><thead><tr><th>Semana</th><th>Leads</th><th>Qualificados</th><th>Agendados</th><th>Propostas</th><th>Fechamentos</th><th>Lead → venda</th><th></th></tr></thead><tbody></tbody></table>
+        <table id="tabelaLeads"><thead><tr><th>Período</th><th>Leads</th><th>Atendimentos</th><th>Em qualificação</th><th>Qualificados</th><th>Agendados</th><th>Propostas</th><th>Fechamentos</th><th>Lead → venda</th><th></th></tr></thead><tbody></tbody></table>
       </div>
       <div class="card" style="padding:0;overflow-x:auto;display:none" id="wrapLeadsMes">
-        <table id="tabelaLeadsMes"><thead><tr><th>Mês</th><th>Semanas</th><th>Leads</th><th>Qualificados</th><th>Agendados</th><th>Propostas</th><th>Fechamentos</th><th>Qualif.</th><th>Agend.</th><th>Proposta</th><th>Fechou</th><th>Lead → venda</th></tr></thead><tbody></tbody></table>
-        <div class="hint" style="margin:0;padding:10px 16px">Cada semana entra no mês em que ela começa (segunda-feira). Os percentuais mostram quanto passa de uma etapa para a seguinte.</div>
+        <table id="tabelaLeadsMes"><thead><tr><th>Mês</th><th>Semanas</th><th>Leads</th><th>Atend.</th><th>Em qualif.</th><th>Qualificados</th><th>Agendados</th><th>Propostas</th><th>Fechamentos</th><th>Atend.</th><th>Em qualif.</th><th>Qualif.</th><th>Agend.</th><th>Proposta</th><th>Fechou</th><th>Lead → venda</th></tr></thead><tbody></tbody></table>
+        <div class="hint" style="margin:0;padding:10px 16px">Cada período entra no mês da sua data de início. Os percentuais mostram quanto passa de uma etapa para a seguinte.</div>
       </div>
     </div>
 
@@ -1236,13 +1243,18 @@ async function excluirCampanha(){
 }
 
 /* ===== LEADS (funil semanal) ===== */
-const LEAD_ETAPAS = [['Leads gerados','leads_gerados'],['Qualificados','qualificados'],['Agendados','agendados'],['Propostas','propostas'],['Fechamentos','fechamentos']];
+const LEAD_ETAPAS = [['Leads gerados','leads_gerados'],['Atendimentos realizados','atendimentos'],['Leads em qualificação','em_qualificacao'],['Qualificados','qualificados'],['Agendados','agendados'],['Propostas','propostas'],['Fechamentos','fechamentos']];
 function segundaDe(dataStr){
   const d = new Date(dataStr+'T00:00:00');
   const dow = (d.getDay()+6)%7;
   return addDias(dataStr, -dow);
 }
-function fmtSemana(s){ const fim = addDias(s,6); const f=x=>x.split('-').reverse().slice(0,2).join('/'); return `${f(s)} a ${f(fim)}`; }
+function fimDaSemana(s){ return s.semana_fim || addDias(s.semana_inicio,6); }
+function fmtSemana(s){ const f=x=>x.split('-').reverse().slice(0,2).join('/'); return `${f(s.semana_inicio)} a ${f(fimDaSemana(s))}`; }
+function rotuloPeriodo(ini,fim){ const f=x=>x.split('-').reverse().slice(0,2).join('/'); return (ini&&fim) ? `Semana (${f(ini)} ao ${f(fim)})` : 'Semana (dia X ao dia Y)'; }
+function atualizarRotuloSemana(){ document.getElementById('lfRotulo').textContent = rotuloPeriodo(document.getElementById('lfInicio').value, document.getElementById('lfFim').value); }
+// padrão: o relatório cobre de sexta a quinta; sugere a última quinta já encerrada e os 7 dias até ela
+function periodoPadraoLeads(){ let fim = addDias(hojeStr(), -1); while(new Date(fim+'T00:00:00').getDay()!==4) fim = addDias(fim,-1); return { ini: addDias(fim,-6), fim }; }
 function pctTxt(a,b){ return b>0 ? (a/b*100).toFixed(0)+'%' : '—'; }
 const MESES_ABR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 function visaoLeads(){ return document.getElementById('leadsVisao').value; }
@@ -1261,8 +1273,7 @@ function semanasDoPeriodo(){
     const corte = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
     return todoFunilSemanal.filter(s=>s.semana_inicio>=corte);
   }
-  const corte = addDias(segundaDe(hojeStr()), -7*(n-1));
-  return todoFunilSemanal.filter(s=>s.semana_inicio>=corte);
+  return todoFunilSemanal.slice(0,n);
 }
 function agruparLeadsPorMes(sem){
   const m = {};
@@ -1278,7 +1289,7 @@ function fmtMesLeads(k){ const [y,mm]=k.split('-'); return `${MESES_ABR[+mm-1]}/
 function renderLeads(){
   const ehGestor = currentProfile?.role==='gestor';
   document.getElementById('leadsForm').style.display = ehGestor ? '' : 'none';
-  if(!document.getElementById('lfSemana').value) document.getElementById('lfSemana').value = hojeStr();
+  if(!document.getElementById('lfInicio').value){ const pp = periodoPadraoLeads(); document.getElementById('lfInicio').value = pp.ini; document.getElementById('lfFim').value = pp.fim; setFormSemana(todoFunilSemanal.find(x=>x.semana_inicio===pp.ini)); atualizarRotuloSemana(); }
   const sem = semanasDoPeriodo();
   const soma = k => sem.reduce((s,x)=>s+(+x[k]||0),0);
   const tot = Object.fromEntries(LEAD_ETAPAS.map(([,k])=>[k,soma(k)]));
@@ -1305,22 +1316,22 @@ function renderLeads(){
   document.getElementById('wrapLeadsMes').style.display = mensal ? '' : 'none';
   if(mensal){
     document.querySelector('#tabelaLeadsMes tbody').innerHTML = meses.length ? meses.map(x=>`<tr>
-      <td><strong>${fmtMesLeads(x.mes)}</strong></td><td>${x.n}</td><td>${x.leads_gerados}</td><td>${x.qualificados}</td><td>${x.agendados}</td><td>${x.propostas}</td><td>${x.fechamentos}</td>
-      <td>${pctTxt(x.qualificados,x.leads_gerados)}</td><td>${pctTxt(x.agendados,x.qualificados)}</td><td>${pctTxt(x.propostas,x.agendados)}</td><td>${pctTxt(x.fechamentos,x.propostas)}</td>
+      <td><strong>${fmtMesLeads(x.mes)}</strong></td><td>${x.n}</td><td>${x.leads_gerados}</td><td>${x.atendimentos}</td><td>${x.em_qualificacao}</td><td>${x.qualificados}</td><td>${x.agendados}</td><td>${x.propostas}</td><td>${x.fechamentos}</td>
+      <td>${pctTxt(x.atendimentos,x.leads_gerados)}</td><td>${pctTxt(x.em_qualificacao,x.atendimentos)}</td><td>${pctTxt(x.qualificados,x.em_qualificacao)}</td><td>${pctTxt(x.agendados,x.qualificados)}</td><td>${pctTxt(x.propostas,x.agendados)}</td><td>${pctTxt(x.fechamentos,x.propostas)}</td>
       <td><strong>${pctTxt(x.fechamentos,x.leads_gerados)}</strong></td></tr>`).join('')
-      : '<tr><td colspan="12" class="empty">Nenhuma semana lançada neste período.</td></tr>';
+      : '<tr><td colspan="16" class="empty">Nenhuma semana lançada neste período.</td></tr>';
   }
   // tabela semanal
   const tbody = document.querySelector('#tabelaLeads tbody');
   tbody.innerHTML = todoFunilSemanal.length ? todoFunilSemanal.map(s=>`<tr ${ehGestor?`style="cursor:pointer" onclick='carregarSemanaNoForm(${JSON.stringify(s).replace(/'/g,"&apos;")})'`:''}>
-    <td>${fmtSemana(s.semana_inicio)}</td><td>${s.leads_gerados}</td><td>${s.qualificados}</td><td>${s.agendados}</td><td>${s.propostas}</td><td>${s.fechamentos}</td>
+    <td>${fmtSemana(s)}</td><td>${s.leads_gerados}</td><td>${s.atendimentos||0}</td><td>${s.em_qualificacao||0}</td><td>${s.qualificados}</td><td>${s.agendados}</td><td>${s.propostas}</td><td>${s.fechamentos}</td>
     <td>${pctTxt(s.fechamentos,s.leads_gerados)}</td>
     <td>${ehGestor?`<button class="btn btn-danger" style="padding:4px 9px;font-size:11.5px" onclick="event.stopPropagation();excluirSemanaLeads('${s.id}')">Excluir</button>`:''}</td></tr>`).join('')
-    : '<tr><td colspan="8" class="empty">Nenhuma semana lançada ainda.</td></tr>';
+    : '<tr><td colspan="10" class="empty">Nenhuma semana lançada ainda.</td></tr>';
 }
 function funilVerticalHTML(tot){
   const etapas = LEAD_ETAPAS.map(([nome,k])=>({nome, v:+tot[k]||0}));
-  const cores = ['#2A3568','#3B4A8C','#4A5899','#2DB863','#1A6B3A'];
+  const cores = ['#2A3568','#33427E','#3B4A8C','#4A5899','#3E9A78','#2DB863','#1A6B3A'];
   const compacto = window.innerWidth < 640;
   // geometria: as laterais de todas as etapas ficam sobre as mesmas duas linhas inclinadas
   const W = compacto?360:860, cx = compacto?180:300, Wmax = compacto?340:580, k = compacto?0.30:0.46;
@@ -1368,36 +1379,47 @@ function funilVerticalHTML(tot){
 }
 function setFormSemana(s){
   document.getElementById('lfLeads').value = s?.leads_gerados ?? '';
+  document.getElementById('lfAtend').value = s?.atendimentos ?? '';
+  document.getElementById('lfEmQual').value = s?.em_qualificacao ?? '';
   document.getElementById('lfQual').value = s?.qualificados ?? '';
   document.getElementById('lfAgend').value = s?.agendados ?? '';
   document.getElementById('lfProp').value = s?.propostas ?? '';
   document.getElementById('lfFech').value = s?.fechamentos ?? '';
 }
 function carregarSemanaNoForm(s){
-  document.getElementById('lfSemana').value = s.semana_inicio;
+  document.getElementById('lfInicio').value = s.semana_inicio;
+  document.getElementById('lfFim').value = fimDaSemana(s);
   setFormSemana(s);
-  document.getElementById('lfSemana').scrollIntoView({behavior:'smooth',block:'center'});
+  atualizarRotuloSemana();
+  document.getElementById('lfInicio').scrollIntoView({behavior:'smooth',block:'center'});
 }
-function aoMudarSemanaLeads(){
-  const ini = segundaDe(document.getElementById('lfSemana').value || hojeStr());
+function aoMudarInicioLeads(){
+  const ini = document.getElementById('lfInicio').value;
+  if(ini) document.getElementById('lfFim').value = addDias(ini,6);
   setFormSemana(todoFunilSemanal.find(x=>x.semana_inicio===ini));
+  atualizarRotuloSemana();
 }
+function aoMudarFimLeads(){ atualizarRotuloSemana(); }
 function preencherPropostasFechamentos(){
-  const ini = segundaDe(document.getElementById('lfSemana').value || hojeStr());
-  const fim = addDias(ini,6);
+  const ini = document.getElementById('lfInicio').value, fim = document.getElementById('lfFim').value;
+  if(!ini || !fim){ showToast('Informe a data de início e a data final.','error'); return; }
   document.getElementById('lfProp').value = todasPropostas.filter(p=>p.data>=ini && p.data<=fim).length;
   document.getElementById('lfFech').value = todasVendas.filter(v=>v.data>=ini && v.data<=fim).length;
-  showToast('Preenchido com o que está no sistema nessa semana. Ajuste se precisar.');
+  showToast('Preenchido com o que está no sistema nesse período. Ajuste se precisar.');
 }
 async function salvarFunilSemana(){
   if(currentProfile?.role!=='gestor') return;
-  const dia = document.getElementById('lfSemana').value;
-  if(!dia){ showToast('Escolha a semana.','error'); return; }
+  const ini = document.getElementById('lfInicio').value, fim = document.getElementById('lfFim').value;
+  if(!ini || !fim){ showToast('Informe a data de início e a data final.','error'); return; }
+  if(fim<ini){ showToast('A data final não pode ser antes da data de início.','error'); return; }
+  if(diffDias(fim,ini)>13){ if(!confirm('Esse período tem mais de 14 dias. Salvar mesmo assim?')) return; }
   const v = id => parseInt(document.getElementById(id).value)||0;
-  const row = { semana_inicio: segundaDe(dia), leads_gerados:v('lfLeads'), qualificados:v('lfQual'), agendados:v('lfAgend'), propostas:v('lfProp'), fechamentos:v('lfFech') };
-  const seq = [row.leads_gerados,row.qualificados,row.agendados,row.propostas,row.fechamentos];
+  const row = { semana_inicio: ini, semana_fim: fim, leads_gerados:v('lfLeads'), atendimentos:v('lfAtend'), em_qualificacao:v('lfEmQual'), qualificados:v('lfQual'), agendados:v('lfAgend'), propostas:v('lfProp'), fechamentos:v('lfFech') };
+  const seq = [row.leads_gerados,row.atendimentos,row.em_qualificacao,row.qualificados,row.agendados,row.propostas,row.fechamentos];
+  // cada etapa é comparada com a anterior; "qualificados" é comparada com os atendimentos (leads em qualificação é um estoque, pode ser menor que os qualificados)
+  const ref = [null,0,1,1,3,4,5];
   for(let i=1;i<seq.length;i++){
-    if(seq[i]>seq[i-1]){ showToast(`${LEAD_ETAPAS[i][0]} não pode ser maior que ${LEAD_ETAPAS[i-1][0].toLowerCase()}. Confira os números.`,'error'); return; }
+    if(seq[i]>seq[ref[i]]){ showToast(`${LEAD_ETAPAS[i][0]} não pode ser maior que ${LEAD_ETAPAS[ref[i]][0].toLowerCase()}. Confira os números.`,'error'); return; }
   }
   const {error} = await sb.from('funil_semanal').upsert(row, {onConflict:'semana_inicio'});
   if(error){ showToast('Erro: '+error.message,'error'); return; }
