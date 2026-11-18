@@ -828,8 +828,10 @@ select,input[type=date],input[type=number],input[type=text]{background:var(--sur
     <input type="hidden" id="recVendaId">
     <input type="hidden" id="recNumeroParcela">
     <input type="hidden" id="recTotalParcelas">
+    <input type="hidden" id="recValorPrevisto">
     <div class="field"><label>Cliente / Parcela</label><div id="recInfo" style="font-size:14px;font-weight:500"></div></div>
     <div class="field"><label>Valor</label><div id="recValor" style="font-size:18px;font-family:'DM Serif Display',serif;color:var(--accent)"></div></div>
+    <div class="field"><label>Valor recebido (R$)</label><input type="number" step="0.01" min="0" id="recValorRecebido" oninput="atualizarDifRecebimento()"><div class="hint" id="recDif"></div></div>
     <div class="field"><label>Data que recebeu</label><input type="date" id="recData"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modalRecebimento')">Cancelar</button>
@@ -865,6 +867,7 @@ function calcComissao(parcela, operadora){
   const liquida = bruta * (1 - IMPOSTO);
   return { categoria, bruta, liquida };
 }
+function valorReal(r){ return (r.data_recebido && r.valor_recebido!=null) ? (+r.valor_recebido||0) : (+r.valor||0); }
 function fmtMoeda(v){ return 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function mesLabel(mesStr){
   const [y,m] = mesStr.split('-');
@@ -1753,7 +1756,7 @@ function registrosAnalise(base, ini, fim){
   if(base==='caixa'){
     return todosRecebimentos.filter(r=>r.data_recebido && r.data_recebido>=ini && r.data_recebido<=fim).map(r=>{
       const v = todasVendas.find(x=>x.id===r.venda_id) || {};
-      return { vid:r.venda_id, vendedor:r.venda?.vendedor||v.vendedor||'—', operadora:r.venda?.operadora||v.operadora||'—', categoria:v.categoria||'200', parcela:+v.parcela||0, valor:+r.valor||0, data:r.data_recebido };
+      return { vid:r.venda_id, vendedor:r.venda?.vendedor||v.vendedor||'—', operadora:r.venda?.operadora||v.operadora||'—', categoria:v.categoria||'200', parcela:+v.parcela||0, valor:valorReal(r), data:r.data_recebido };
     });
   }
   return todasVendas.filter(v=>v.data>=ini && v.data<=fim).map(v=>({ vid:v.id, vendedor:v.vendedor, operadora:v.operadora, categoria:v.categoria, parcela:+v.parcela||0, valor:+v.comissao_liquida||0, data:v.data }));
@@ -2052,7 +2055,7 @@ function renderVendasTable(){
 function recebidoDaVenda(vendaId){
   const parcelas = todosRecebimentos.filter(r=>r.venda_id===vendaId);
   const rec = parcelas.filter(r=>r.data_recebido);
-  return { valor: rec.reduce((s,r)=>s+(+r.valor||0),0), nRec: rec.length, nTotal: parcelas.length };
+  return { valor: rec.reduce((s,r)=>s+valorReal(r),0), nRec: rec.length, nTotal: parcelas.length };
 }
 function calcProducaoPorVendedor(vendas, nomeVendedor){
   const doVendedor = vendas.filter(v=>v.vendedor===nomeVendedor);
@@ -2488,7 +2491,7 @@ function dadosFluxoCaixa(){
   return meses.map(m=>{
     const recebido = todosRecebimentos
       .filter(r=>r.data_recebido && (r.data_recebido||'').slice(0,7)===m)
-      .reduce((s,r)=>s+(+r.valor||0),0);
+      .reduce((s,r)=>s+valorReal(r),0);
     const pend = todosRecebimentos.filter(r=>{ if(r.data_recebido) return false; const d=dataEstimadaParcela(r); return d && d.slice(0,7)===m; });
     const atrasado = pend.filter(r=>dataEstimadaParcela(r) < hj).reduce((s,r)=>s+(+r.valor||0),0);
     const previsto = pend.filter(r=>dataEstimadaParcela(r) >= hj).reduce((s,r)=>s+(+r.valor||0),0);
@@ -2531,8 +2534,8 @@ function renderFinanceiro(){
   const totalPendente = pendentes.reduce((s,r)=>s+(+r.valor||0),0);
   const hoje = new Date();
   const mesAtual = mesAtualStr();
-  const recebidoMes = recebidos.filter(r=>(r.data_recebido||'').slice(0,7)===mesAtual).reduce((s,r)=>s+(+r.valor||0),0);
-  const totalRecebidoHistorico = recebidos.reduce((s,r)=>s+(+r.valor||0),0);
+  const recebidoMes = recebidos.filter(r=>(r.data_recebido||'').slice(0,7)===mesAtual).reduce((s,r)=>s+valorReal(r),0);
+  const totalRecebidoHistorico = recebidos.reduce((s,r)=>s+valorReal(r),0);
   const totalPotencial = potencialPropostas().reduce((s,x)=>s+x.valor,0);
 
   document.getElementById('financeiroCards').innerHTML = `
@@ -2600,7 +2603,7 @@ function renderFinanceiro(){
       <td>${v.vendedor||'—'}</td>
       <td>${OPERADORA_LABEL[v.operadora]||v.operadora||'—'}</td>
       <td>${r.numero_parcela}/${r.total_parcelas}</td>
-      <td>${fmtMoeda(r.valor)}</td>
+      <td>${r.data_recebido && r.valor_recebido!=null && Math.abs(+r.valor_recebido-(+r.valor))>0.004 ? `<strong>${fmtMoeda(r.valor_recebido)}</strong><div class="hint" style="margin:0">previsto ${fmtMoeda(r.valor)}</div>` : fmtMoeda(r.valor)}</td>
       <td>${previsaoTxt}</td>
       <td>${statusBadge}</td>
       <td>${acao}</td>
@@ -2614,8 +2617,19 @@ function abrirModalRecebimento(r){
   document.getElementById('recTotalParcelas').value = r.total_parcelas;
   document.getElementById('recInfo').textContent = `${r.venda?.cliente||''} — parcela ${r.numero_parcela}/${r.total_parcelas}`;
   document.getElementById('recValor').textContent = fmtMoeda(r.valor);
+  document.getElementById('recValorPrevisto').value = r.valor;
+  document.getElementById('recValorRecebido').value = (+r.valor||0).toFixed(2);
+  atualizarDifRecebimento();
   document.getElementById('recData').value = new Date().toISOString().slice(0,10);
   document.getElementById('modalRecebimento').classList.add('visible');
+}
+function atualizarDifRecebimento(){
+  const prev = parseFloat(document.getElementById('recValorPrevisto').value)||0;
+  const rec = parseFloat(document.getElementById('recValorRecebido').value);
+  const el = document.getElementById('recDif');
+  if(isNaN(rec)){ el.textContent=''; return; }
+  const d = Math.round((rec-prev)*100)/100;
+  el.innerHTML = d===0 ? 'Igual ao valor previsto.' : (d>0 ? `<span style="color:var(--green-dark)">+${fmtMoeda(d)} acima do previsto</span>` : `<span style="color:var(--danger)">${fmtMoeda(-d)} abaixo do previsto</span>`);
 }
 async function confirmarRecebimento(){
   const id = document.getElementById('recId').value;
@@ -2624,8 +2638,10 @@ async function confirmarRecebimento(){
   const totalParcelas = parseInt(document.getElementById('recTotalParcelas').value);
   const dataRecebido = document.getElementById('recData').value;
   if(!dataRecebido){ showToast('Informe a data.','error'); return; }
+  const valorRecebido = parseFloat(document.getElementById('recValorRecebido').value);
+  if(isNaN(valorRecebido) || valorRecebido<0){ showToast('Informe o valor recebido.','error'); return; }
   try{
-    const {error} = await sb.from('recebimentos').update({data_recebido:dataRecebido}).eq('id',id);
+    const {error} = await sb.from('recebimentos').update({data_recebido:dataRecebido, valor_recebido:valorRecebido}).eq('id',id);
     if(error) throw error;
     // Cascateia: define a previsão da próxima parcela = data que recebeu + 30 dias
     if(numeroParcela < totalParcelas){
